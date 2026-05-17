@@ -1,0 +1,112 @@
+.radio-group {
+  display: flex;
+  gap: 32px;
+  padding: 8px 0;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.radio-group input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-green);
+}
+
+.status-active {
+  color: var(--primary-green);
+  font-weight: 500;
+}
+
+.status-pending {
+  color: #FF9500;
+  font-weight: 500;
+}
+
+.table-btn.danger {
+  color: var(--warning-red);
+  border-color: var(--warning-red);
+}
+
+.report-table {
+  margin-bottom: 32px;
+  overflow-x: auto;
+}
+
+.report-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.report-table th,
+.report-table td {
+  padding: 12px 16px;
+  text-align: center;
+  border: 1px solid black;
+  font-size: 14px;
+}
+
+.report-table th {
+  background-color: white;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.report-table td {
+  background-color: white;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.report-table .table-title {
+  background-color: white;
+  padding: 20px 16px;
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.report-table .table-header-info {
+  background-color: white;
+  padding: 20px 16px;
+}
+
+.report-table .table-header-info .info-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+  justify-content: center;
+}
+
+.report-table .table-combined-header {
+  background-color: white;
+  padding: 10px 16px;
+  border-bottom: none !important;
+}
+
+.report-table .table-title-row {
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  padding-bottom: 10px;
+}
+
+.report-table .table-info-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+  justify-content: center;
+  align-items: center;
+}

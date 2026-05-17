@@ -1,0 +1,235 @@
+.page-container {
+  min-height: 100vh;
+  background-color: var(--light-green);
+}
+
+.header {
+  background-color: var(--pure-white);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 16px 0;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-content h2 {
+  font-size: 20px;
+  color: var(--text-primary);
+}
+
+.logout-btn {
+  background-color: var(--disabled-gray);
+  color: var(--text-primary);
+  border: none;
+  padding: 8px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tabs {
+  max-width: 1200px;
+  margin: 24px auto 0;
+  padding: 0 24px;
+  display: flex;
+  gap: 8px;
+}
+
+.tab {
+  background-color: var(--pure-white);
+  color: var(--primary-green);
+  border: 1px solid var(--primary-green);
+  padding: 10px 24px;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tab.active {
+  background-color: var(--primary-green);
+  color: var(--pure-white);
+}
+
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px 48px;
+}
+
+.card {
+  background-color: var(--pure-white);
+  border-radius: 0 8px 8px 8px;
+  padding: 32px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-gray);
+}
+
+.header-info {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.info-item {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  flex: 1;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.form-group input {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-gray);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: var(--primary-green);
+}
+
+.form-group input:disabled {
+  background-color: var(--border-gray);
+  cursor: not-allowed;
+}
+
+.validation-error {
+  color: var(--warning-red);
+  font-size: 14px;
+  margin-bottom: 24px;
+  padding: 12px;
+  background-color: #FFF2F0;
+  border-radius: 4px;
+}
+
+.leave-students-section {
+  margin-bottom: 32px;
+}
+
+.leave-students-section h3 {
+  font-size: 16px;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.leave-student-item {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.leave-student-item input[type="text"] {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-gray);
+  border-radius: 4px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.submit-btn {
+  background-color: var(--primary-green);
+  color: var(--pure-white);
+  border: none;
+  padding: 12px 32px;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.edit-btn {
+  background-color: var(--pure-white);
+  color: var(--primary-green);
+  border: 1px solid var(--primary-green);
+  padding: 12px 32px;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.secondary-btn {
+  background-color: var(--pure-white);
+  color: var(--primary-green);
+  border: 1px solid var(--primary-green);
+  padding: 12px 32px;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-right: 12px;
+}
+
+.table-btn {
+  background-color: var(--pure-white);
+  color: var(--primary-green);
+  border: 1px solid var(--primary-green);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+
+.history-list {
+  margin-top: 24px;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-gray);
+}
+
+.history-info {
+  display: flex;
+  gap: 24px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.history-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.history-status {
+  color: var(--primary-green);
+  font-size: 14px;
+}

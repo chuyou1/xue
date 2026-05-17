@@ -1,0 +1,154 @@
+/* 模态框遮罩层 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 模态框容器 */
+.modal-container {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 400px;
+  max-width: 90%;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 模态框头部 */
+.modal-header {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  border-radius: 8px 8px 0 0;
+}
+
+.modal-success .modal-header {
+  background-color: #ecfdf5;
+  color: #065f46;
+}
+
+.modal-warning .modal-header {
+  background-color: #fffbeb;
+  color: #92400e;
+}
+
+.modal-error .modal-header {
+  background-color: #fef2f2;
+  color: #991b1b;
+}
+
+.modal-info .modal-header {
+  background-color: #eff6ff;
+  color: #1e40af;
+}
+
+/* 模态框图标 */
+.modal-icon {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+/* 模态框标题 */
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  flex: 1;
+}
+
+/* 关闭按钮 */
+.modal-close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.modal-close-btn:hover {
+  color: #374151;
+}
+
+/* 模态框内容 */
+.modal-body {
+  padding: 24px 20px;
+}
+
+.modal-message {
+  font-size: 15px;
+  color: #374151;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* 模态框底部 */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #e5e7eb;
+  border-radius: 0 0 8px 8px;
+}
+
+/* 按钮样式 */
+.modal-btn {
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.modal-btn-primary {
+  background-color: #36b37e;
+  color: white;
+}
+
+.modal-btn-primary:hover {
+  background-color: #2d9a6b;
+}
+
+.modal-btn-secondary {
+  background-color: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.modal-btn-secondary:hover {
+  background-color: #e5e7eb;
+}
