@@ -51,7 +51,6 @@ function Login({ onLogin }: LoginProps) {
       <div className="login-box">
         <div className="login-header">
           <h1>计科院学风建设督查系统</h1>
-          <p>统一身份认证登录</p>
         </div>
         
         <form className="login-form" onSubmit={handleSubmit}>
@@ -83,9 +82,7 @@ function Login({ onLogin }: LoginProps) {
           <button type="submit" className="login-button">登录</button>
         </form>
         
-        <div className="login-tips">
-          <p>系统将自动识别您的身份角色</p>
-        </div>
+
       </div>
     </div>
   )
