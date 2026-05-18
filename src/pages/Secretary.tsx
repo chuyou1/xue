@@ -455,7 +455,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                       accept="image/*" 
                       onChange={(e) => handleFileChange(index, e)} 
                     />
-                    {!violation.hasPhoto && <span style={{ color: '#e74c3c', fontSize: '12px' }}>（需上传照片）</span>}
+                    {!violation.hasPhoto && <span style={{ color: '#e74c3c', fontSize: 'var(--font-size-base)' }}>（需上传照片）</span>}
                     <button className="remove-btn" onClick={() => removeViolation(index)}>删除</button>
                   </div>
                 ))}
@@ -480,7 +480,6 @@ function Secretary({ user, onLogout }: SecretaryProps) {
 
         {activeTab === 'report' && (
           <div className="card">
-            <h3>督查表生成</h3>
             <div className="report-table">
               <table className="standard-table">
                 <thead>

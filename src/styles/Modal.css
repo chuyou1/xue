@@ -75,13 +75,13 @@
 
 /* 模态框图标 */
 .modal-icon {
-  font-size: 24px;
+  font-size: var(--font-size-base);
   margin-right: 12px;
 }
 
 /* 模态框标题 */
 .modal-title {
-  font-size: 18px;
+  font-size: var(--font-size-base);
   font-weight: 600;
   flex: 1;
 }
@@ -90,7 +90,7 @@
 .modal-close-btn {
   background: none;
   border: none;
-  font-size: 28px;
+  font-size: var(--font-size-base);
   cursor: pointer;
   color: #9ca3af;
   padding: 0;
@@ -108,7 +108,7 @@
 }
 
 .modal-message {
-  font-size: 15px;
+  font-size: var(--font-size-base);
   color: #374151;
   line-height: 1.6;
   margin: 0;
@@ -128,7 +128,7 @@
 .modal-btn {
   padding: 10px 24px;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -166,16 +166,16 @@
   }
   
   .modal-title {
-    font-size: 16px;
+    font-size: var(--font-size-base);
   }
   
   .modal-icon {
-    font-size: 20px;
+    font-size: var(--font-size-base);
     margin-right: 8px;
   }
   
   .modal-close-btn {
-    font-size: 24px;
+    font-size: var(--font-size-base);
   }
   
   .modal-body {
@@ -183,7 +183,7 @@
   }
   
   .modal-message {
-    font-size: 14px;
+    font-size: var(--font-size-base);
   }
   
   .modal-footer {
@@ -193,6 +193,6 @@
   
   .modal-btn {
     padding: 8px 16px;
-    font-size: 13px;
+    font-size: var(--font-size-base);
   }
 }

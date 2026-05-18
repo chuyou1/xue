@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import '../styles/ClassMonitor.css'
 import { User, getClassInfo, ClassInfo, saveAttendanceRecord, getAttendanceRecords, AttendanceRecord as GlobalAttendanceRecord } from '../data'
 
@@ -10,6 +10,7 @@ interface ClassMonitorProps {
 interface LeaveStudent {
   name: string
   photo?: File
+  photoPreview?: string
 }
 
 interface AttendanceRecord {
@@ -37,6 +38,7 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
   const [activeTab, setActiveTab] = useState('attendance')
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null)
+  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const classInfo: ClassInfo | undefined = user.className ? getClassInfo(user.className) : undefined
   const total = classInfo ? classInfo.count.toString() : '30'
@@ -47,6 +49,26 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     }, 1000)
     return () => clearInterval(timer)
   }, [])
+
+  // 自动关闭验证错误弹窗
+  useEffect(() => {
+    if (validationError) {
+      // 清除之前的定时器
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current)
+      }
+      // 设置新的定时器，3秒后自动关闭
+      autoCloseTimerRef.current = setTimeout(() => {
+        setValidationError('')
+      }, 3000)
+    }
+    // 清理函数
+    return () => {
+      if (autoCloseTimerRef.current) {
+        clearTimeout(autoCloseTimerRef.current)
+      }
+    }
+  }, [validationError])
 
   // 从全局存储加载历史记录
   useEffect(() => {
@@ -90,9 +112,29 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     return true
   }
 
+  const validateLeaveStudents = () => {
+    const leaveCount = parseInt(leave) || 0
+    if (leaveCount === 0) return true
+    
+    for (let i = 0; i < leaveCount; i++) {
+      const student = leaveStudents[i]
+      if (!student || !student.name.trim()) {
+        setValidationError(`请填写第 ${i + 1} 位请假学生的姓名`)
+        return false
+      }
+      if (!student.photo) {
+        setValidationError(`请为第 ${i + 1} 位请假学生上传照片`)
+        return false
+      }
+    }
+    setValidationError('')
+    return true
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateAttendance()) return
+    if (!validateLeaveStudents()) return
     
     const newRecord: AttendanceRecord = {
       id: editingRecordId || Date.now().toString(),
@@ -275,28 +317,58 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
               </div>
 
               {validationError && (
-                <div className="validation-error">{validationError}</div>
+                <div className="validation-error">
+                  <span>{validationError}</span>
+                  <button 
+                    className="validation-error-close"
+                    onClick={() => setValidationError('')}
+                    aria-label="关闭"
+                  >
+                    ×
+                  </button>
+                </div>
               )}
 
               {leaveStudents.length > 0 && (
-                <div className="leave-students-section">
-                  <h3>请假人员信息</h3>
-                  {leaveStudents.map((student, index) => (
-                    <div key={index} className="leave-student-item">
-                      <input
-                        type="text"
-                        placeholder="请输入请假学生姓名"
-                        value={student.name}
-                        onChange={(e) => {
+                <div className="form-row">
+                  <div className="leave-students-section">
+                    <label>请假人员信息</label>
+                    <input
+                      type="text"
+                      placeholder="请输入请假学生姓名"
+                      value={leaveStudents[0]?.name || ''}
+                      onChange={(e) => {
+                        const newStudents = [...leaveStudents]
+                        newStudents[0].name = e.target.value
+                        setLeaveStudents(newStudents)
+                      }}
+                      disabled={submitted && !editingRecordId}
+                    />
+                  </div>
+                  <div className="leave-students-section">
+                    <label>请假证明</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={submitted && !editingRecordId}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
                           const newStudents = [...leaveStudents]
-                          newStudents[index].name = e.target.value
-                          setLeaveStudents(newStudents)
-                        }}
-                        disabled={submitted && !editingRecordId}
-                      />
-                      <input type="file" accept="image/*" disabled={submitted && !editingRecordId} />
-                    </div>
-                  ))}
+                          newStudents[0].photo = file
+                          const reader = new FileReader()
+                          reader.onload = (event) => {
+                            newStudents[0].photoPreview = event.target?.result as string
+                            setLeaveStudents(newStudents)
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
+                    />
+                    {leaveStudents[0]?.photoPreview && (
+                      <img src={leaveStudents[0].photoPreview} alt="请假证明照片" className="photo-preview" />
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -327,7 +399,6 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
           </div>
         ) : (
           <div className="card">
-            <h3>历史考勤记录</h3>
             {attendanceRecords.length === 0 ? (
               <div className="empty-state" style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
                 暂无历史考勤记录

@@ -19,7 +19,7 @@
 }
 
 .header-content h2 {
-  font-size: 20px;
+  font-size: var(--font-size-base);
   color: var(--text-primary);
 }
 
@@ -30,7 +30,7 @@
   padding: 8px 20px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .tabs {
@@ -48,7 +48,7 @@
   padding: 10px 24px;
   border-radius: 4px 4px 0 0;
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .tab.active {
@@ -82,7 +82,7 @@
 }
 
 .info-item {
-  font-size: 14px;
+  font-size: var(--font-size-base);
   color: var(--text-secondary);
 }
 
@@ -98,7 +98,7 @@
 
 .form-group label {
   display: block;
-  font-size: 14px;
+  font-size: var(--font-size-base);
   color: var(--text-primary);
   margin-bottom: 8px;
 }
@@ -109,7 +109,7 @@
   padding: 0 12px;
   border: 1px solid var(--border-gray);
   border-radius: 4px;
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .form-group input:focus {
@@ -123,42 +123,92 @@
 }
 
 .validation-error {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
   color: var(--warning-red);
-  font-size: 14px;
-  margin-bottom: 24px;
-  padding: 12px;
+  font-size: var(--font-size-base);
+  padding: 16px 24px;
   background-color: #FFF2F0;
-  border-radius: 4px;
+  border: 1px solid var(--warning-red);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.validation-error-close {
+  background: none;
+  border: none;
+  color: var(--warning-red);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: opacity 0.2s;
+}
+
+.validation-error-close:hover {
+  opacity: 0.7;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .leave-students-section {
-  margin-bottom: 32px;
-}
-
-.leave-students-section h3 {
-  font-size: 16px;
-  color: var(--text-primary);
-  margin-bottom: 16px;
-}
-
-.leave-student-item {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 12px;
-  align-items: center;
-}
-
-.leave-student-item input[type="text"] {
   flex: 1;
+}
+
+.leave-students-section label {
+  display: block;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.leave-students-section input[type="text"] {
+  width: 100%;
   height: 40px;
   padding: 0 12px;
   border: 1px solid var(--border-gray);
   border-radius: 4px;
+  font-size: var(--font-size-base);
+}
+
+.leave-students-section input[type="file"] {
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  text-align: center;
+}
+
+.photo-preview {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid var(--border-gray);
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
 }
 
 .submit-btn {
@@ -167,7 +217,7 @@
   border: none;
   padding: 12px 32px;
   border-radius: 4px;
-  font-size: 16px;
+  font-size: var(--font-size-base);
   cursor: pointer;
 }
 
@@ -177,7 +227,7 @@
   border: 1px solid var(--primary-green);
   padding: 12px 32px;
   border-radius: 4px;
-  font-size: 16px;
+  font-size: var(--font-size-base);
   cursor: pointer;
 }
 
@@ -187,7 +237,7 @@
   border: 1px solid var(--primary-green);
   padding: 12px 32px;
   border-radius: 4px;
-  font-size: 16px;
+  font-size: var(--font-size-base);
   cursor: pointer;
   margin-right: 12px;
 }
@@ -198,7 +248,7 @@
   border: 1px solid var(--primary-green);
   padding: 6px 12px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--font-size-base);
   cursor: pointer;
   margin-right: 8px;
 }
@@ -217,21 +267,21 @@
 
 .history-info {
   display: flex;
-  gap: 24px;
-  font-size: 14px;
-  color: var(--text-secondary);
+  gap: 32px;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
   flex-wrap: wrap;
 }
 
 .history-actions {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
 }
 
 .history-status {
   color: var(--primary-green);
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 @media screen and (max-width: 768px) {
@@ -242,13 +292,13 @@
   }
   
   .header-content h2 {
-    font-size: 16px;
+    font-size: var(--font-size-base);
     width: 100%;
   }
   
   .logout-btn {
     padding: 6px 12px;
-    font-size: 12px;
+    font-size: var(--font-size-base);
   }
   
   .tabs {
@@ -259,7 +309,7 @@
   
   .tab {
     padding: 8px 16px;
-    font-size: 12px;
+    font-size: var(--font-size-base);
     flex-shrink: 0;
   }
   
@@ -281,7 +331,7 @@
   }
   
   .info-item {
-    font-size: 12px;
+    font-size: var(--font-size-base);
   }
   
   .form-row {
@@ -291,12 +341,12 @@
   }
   
   .form-group label {
-    font-size: 12px;
+    font-size: var(--font-size-base);
   }
   
   .form-group input {
     height: 36px;
-    font-size: 13px;
+    font-size: var(--font-size-base);
     padding: 0 10px;
   }
   
@@ -313,7 +363,7 @@
   .edit-btn,
   .secondary-btn {
     padding: 10px 20px;
-    font-size: 14px;
+    font-size: var(--font-size-base);
   }
   
   .form-actions {
@@ -330,7 +380,7 @@
   
   .history-info {
     gap: 12px;
-    font-size: 12px;
+    font-size: var(--font-size-base);
   }
   
   .history-actions {
@@ -340,6 +390,6 @@
   
   .table-btn {
     padding: 4px 10px;
-    font-size: 11px;
+    font-size: var(--font-size-base);
   }
 }

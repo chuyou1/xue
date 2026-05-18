@@ -385,11 +385,11 @@ function Cadre({ user, onLogout }: CadreProps) {
                                 <div className="classroom-number">{slot.date}</div>
                                 <div className="classroom-status">{formatTimeSlot(slot.timeSlot)}</div>
                               </div>
-                              <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+                              <div style={{ fontSize: 'var(--font-size-base)', color: '#666', marginTop: '8px' }}>
                                 {slotStats.count}个班级
                               </div>
                               {slotStats.avgScore !== '-' && (
-                                <div style={{ fontSize: '12px', color: '#4caf50', marginTop: '4px' }}>
+                                <div style={{ fontSize: 'var(--font-size-base)', color: '#4caf50', marginTop: '4px' }}>
                                   平均分：{slotStats.avgScore}分
                                 </div>
                               )}

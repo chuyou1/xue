@@ -13,6 +13,7 @@
   --warning-red: #F53F3F;
   --disabled-gray: #D1D5DB;
   --border-gray: #F2F3F5;
+  --font-size-base: 14px;
 }
 
 body {
@@ -20,6 +21,7 @@ body {
   color: var(--text-primary);
   background-color: var(--pure-white);
   line-height: 1.6;
+  font-size: var(--font-size-base);
 }
 
 #root {
