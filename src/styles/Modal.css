@@ -81,7 +81,7 @@
 
 /* 模态框标题 */
 .modal-title {
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-title);
   font-weight: 600;
   flex: 1;
 }
@@ -166,7 +166,7 @@
   }
   
   .modal-title {
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-title);
   }
   
   .modal-icon {

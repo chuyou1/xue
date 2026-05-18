@@ -22,7 +22,7 @@
 }
 
 .login-header h1 {
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-title);
   color: var(--text-primary);
   margin-bottom: 8px;
 }
