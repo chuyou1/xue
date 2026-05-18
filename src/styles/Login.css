@@ -4,6 +4,7 @@
   align-items: center;
   justify-content: center;
   background-color: var(--light-green);
+  padding: 16px;
 }
 
 .login-box {
@@ -89,4 +90,44 @@
 .login-tips p {
   font-size: 14px;
   color: var(--text-secondary);
+}
+
+@media screen and (max-width: 768px) {
+  .login-container {
+    padding: 16px 8px;
+  }
+  
+  .login-box {
+    padding: 32px 24px;
+  }
+  
+  .login-header h1 {
+    font-size: 20px;
+  }
+  
+  .login-header p {
+    font-size: 12px;
+  }
+  
+  .login-form .form-group {
+    margin-bottom: 20px;
+  }
+  
+  .login-form input {
+    height: 40px;
+    font-size: 13px;
+  }
+  
+  .login-button {
+    height: 40px;
+    font-size: 14px;
+  }
+  
+  .login-tips {
+    margin-top: 20px;
+  }
+  
+  .login-tips p {
+    font-size: 12px;
+  }
 }

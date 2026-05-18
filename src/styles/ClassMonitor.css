@@ -233,3 +233,113 @@
   color: var(--primary-green);
   font-size: 14px;
 }
+
+@media screen and (max-width: 768px) {
+  .header-content {
+    padding: 0 12px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .header-content h2 {
+    font-size: 16px;
+    width: 100%;
+  }
+  
+  .logout-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  
+  .tabs {
+    padding: 0 12px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  
+  .tab {
+    padding: 8px 16px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  
+  .main-content {
+    padding: 0 12px 24px;
+  }
+  
+  .card {
+    padding: 20px 16px;
+  }
+  
+  .card-header {
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+  }
+  
+  .header-info {
+    gap: 16px;
+  }
+  
+  .info-item {
+    font-size: 12px;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .form-group label {
+    font-size: 12px;
+  }
+  
+  .form-group input {
+    height: 36px;
+    font-size: 13px;
+    padding: 0 10px;
+  }
+  
+  .leave-student-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .leave-student-item input[type="text"] {
+    width: 100%;
+  }
+  
+  .submit-btn,
+  .edit-btn,
+  .secondary-btn {
+    padding: 10px 20px;
+    font-size: 14px;
+  }
+  
+  .form-actions {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .history-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+  }
+  
+  .history-info {
+    gap: 12px;
+    font-size: 12px;
+  }
+  
+  .history-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  
+  .table-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+}

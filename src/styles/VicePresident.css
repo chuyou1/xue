@@ -110,3 +110,31 @@
   justify-content: center;
   align-items: center;
 }
+
+@media screen and (max-width: 768px) {
+  .radio-group {
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px 0;
+  }
+  
+  .radio-group label {
+    font-size: 12px;
+  }
+  
+  .report-table th,
+  .report-table td {
+    padding: 8px 4px;
+    font-size: 11px;
+  }
+  
+  .report-table .table-title {
+    font-size: 16px;
+    padding: 12px 8px;
+  }
+  
+  .table-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+}

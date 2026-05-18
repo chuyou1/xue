@@ -25,3 +25,13 @@ body {
 #root {
   min-height: 100vh;
 }
+
+@media screen and (max-width: 768px) {
+  html {
+    font-size: 14px;
+  }
+  
+  body {
+    padding: 0 8px;
+  }
+}

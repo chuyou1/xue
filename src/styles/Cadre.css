@@ -167,3 +167,63 @@
   justify-content: center;
   align-items: center;
 }
+
+@media screen and (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(1, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  
+  .stat-card {
+    padding: 20px 16px;
+  }
+  
+  .stat-value {
+    font-size: 32px;
+  }
+  
+  .stat-label {
+    font-size: 12px;
+  }
+  
+  .filter-row {
+    margin-bottom: 16px;
+  }
+  
+  .filter-select {
+    width: 100%;
+    min-width: auto;
+    font-size: 13px;
+  }
+  
+  .photos-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .photo-placeholder {
+    font-size: 12px;
+  }
+  
+  .photo-info {
+    padding: 8px;
+    font-size: 11px;
+  }
+  
+  .report-table th,
+  .report-table td {
+    padding: 8px 4px;
+    font-size: 11px;
+  }
+  
+  .report-table .table-title {
+    font-size: 16px;
+    padding: 12px 8px;
+  }
+  
+  .table-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+}

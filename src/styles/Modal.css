@@ -11,6 +11,7 @@
   align-items: center;
   z-index: 1000;
   animation: fadeIn 0.2s ease-out;
+  padding: 16px;
 }
 
 @keyframes fadeIn {
@@ -151,4 +152,47 @@
 
 .modal-btn-secondary:hover {
   background-color: #e5e7eb;
+}
+
+@media screen and (max-width: 768px) {
+  .modal-container {
+    min-width: auto;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  .modal-header {
+    padding: 12px 16px;
+  }
+  
+  .modal-title {
+    font-size: 16px;
+  }
+  
+  .modal-icon {
+    font-size: 20px;
+    margin-right: 8px;
+  }
+  
+  .modal-close-btn {
+    font-size: 24px;
+  }
+  
+  .modal-body {
+    padding: 16px 16px;
+  }
+  
+  .modal-message {
+    font-size: 14px;
+  }
+  
+  .modal-footer {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+  
+  .modal-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
 }
