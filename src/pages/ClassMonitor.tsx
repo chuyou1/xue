@@ -30,11 +30,7 @@ interface AttendanceRecord {
   absentStudents?: StudentNameInfo[]
 }
 
-// 课程时间配置
-const CLASS_TIMES = {
-  morning: { start: 8, end: 12 },
-  afternoon: { start: 14, end: 18 }
-}
+
 
 function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -55,11 +51,11 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
   const [batchNamesInput, setBatchNamesInput] = useState('')
   const [batchLateNamesInput, setBatchLateNamesInput] = useState('')
   const [batchAbsentNamesInput, setBatchAbsentNamesInput] = useState('')
-  const [currentStage, setCurrentStage] = useState<SubmissionStage>('initial')
+
   const [todayRecordId, setTodayRecordId] = useState<string | null>(null)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const successModalTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const successModalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const classInfo: ClassInfo | undefined = user.className ? getClassInfo(user.className) : undefined
   const total = classInfo ? classInfo.count.toString() : '30'
 
@@ -330,42 +326,6 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     return true
   }
 
-  // 验证学生姓名
-  const validateStudentNames = () => {
-    const leaveCount = parseInt(leave) || 0
-    const lateCount = parseInt(late) || 0
-    const absentCount = parseInt(absent) || 0
-    
-    // 验证请假姓名
-    if (leaveCount > 0) {
-      const validLeaveNames = leaveStudents.filter(s => s.name.trim()).length
-      if (validLeaveNames !== leaveCount) {
-        setValidationError(`请假人数为${leaveCount}，请确保输入${leaveCount}个姓名`)
-        return false
-      }
-    }
-    
-    // 验证迟到姓名
-    if (lateCount > 0) {
-      const validLateNames = lateStudents.filter(s => s.name.trim()).length
-      if (validLateNames !== lateCount) {
-        setValidationError(`迟到人数为${lateCount}，请确保输入${lateCount}个姓名`)
-        return false
-      }
-    }
-    
-    // 验证旷课姓名
-    if (absentCount > 0) {
-      const validAbsentNames = absentStudents.filter(s => s.name.trim()).length
-      if (validAbsentNames !== absentCount) {
-        setValidationError(`旷课人数为${absentCount}，请确保输入${absentCount}个姓名`)
-        return false
-      }
-    }
-    
-    return true
-  }
-
   // 检查是否需要显示特殊情况说明弹窗
   const checkSpecialNoteNeeded = () => {
     const leaveCount = parseInt(leave) || 0
@@ -382,7 +342,7 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     const studentsWithPhoto = leaveStudents.filter(s => s.photo).length
     if (studentsWithPhoto < leaveCount) {
       const missingPhotos = leaveStudents
-        .filter((s, i) => !s.photo)
+        .filter(s => !s.photo)
         .map(s => s.name)
       setStudentsWithoutPhoto(missingPhotos)
       setSpecialNotes({})
@@ -396,7 +356,7 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    const { timeSlot } = getTimeStatus()
+    getTimeStatus()
     
     if (!classroom.trim()) {
       setValidationError('请填写教室编号')
@@ -455,7 +415,7 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     const { timeSlot } = getTimeStatus()
     
     // 准备请假学生信息
-    const leaveStudentInfos: LeaveStudentInfo[] = leaveStudents.map((student, index) => ({
+    const leaveStudentInfos: LeaveStudentInfo[] = leaveStudents.map(student => ({
       name: student.name,
       hasPhoto: !!student.photo,
       specialNote: specialNotes[student.name]
@@ -534,23 +494,6 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     successModalTimerRef.current = setTimeout(() => {
       setShowSuccessModal(false)
     }, 3000)
-  }
-
-  const resetForm = () => {
-    setClassroom('')
-    setPresent('')
-    setLeave('')
-    setLate('')
-    setAbsent('')
-    setLeaveStudents([])
-    setLateStudents([])
-    setAbsentStudents([])
-    setValidationError('')
-    setBatchNamesInput('')
-    setBatchLateNamesInput('')
-    setBatchAbsentNamesInput('')
-    setSpecialNotes({})
-    setStudentsWithoutPhoto([])
   }
 
   const formatTime = (date: Date) => {
@@ -897,7 +840,7 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
               <button className="cancel-btn" onClick={() => setShowSpecialNoteModal(false)}>
                 取消
               </button>
-              <button className="confirm-btn" onClick={submitAttendance}>
+              <button className="confirm-btn" onClick={() => submitAttendance('update')}>
                 确认提交
               </button>
             </div>

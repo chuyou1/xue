@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import '../styles/VicePresident.css'
 import { User, getSupervisionRecords, SupervisionRecord, classroomsByFloor, getUniqueSupervisionRecords, getNotifications, Notification, markNotificationAsRead, getTodayAnomalyCount, getAnomalyRecordsByDate, AnomalyRecord, getAttendanceRecords, AttendanceRecord, classes, getUniqueAttendanceRecords } from '../data'
-import { exportSupervisionRecordsToExcel } from '../utils/exportExcel'
 
 interface VicePresidentProps {
   user: User
@@ -36,8 +35,7 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
   const [currentDate, setCurrentDate] = useState('')
   const [currentTimeSlot, setCurrentTimeSlot] = useState('')
   const [currentDisplayTimeSlot, setCurrentDisplayTimeSlot] = useState('')
-  const [selectedSummaryDate, setSelectedSummaryDate] = useState<string | null>(null)
-  const [selectedSummaryTimeSlot, setSelectedSummaryTimeSlot] = useState<string | null>(null)
+
   const [currentTime, setCurrentTime] = useState(new Date())
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [anomalyCount, setAnomalyCount] = useState(0)
@@ -52,7 +50,6 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
   const [selectedDetailDate, setSelectedDetailDate] = useState<string>('')
   const [selectedYear, setSelectedYear] = useState(2026)
   const [selectedMonth, setSelectedMonth] = useState(5)
-  const [showFutureLimit, setShowFutureLimit] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // 获取根据时间变化的问候语
@@ -218,34 +215,6 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
 
   const stats = getStats()
 
-  // 获取所有有记录的日期和时段组合
-  const getAllDateSlots = () => {
-    const dateSlots = new Set<string>()
-    supervisionRecords.forEach(record => {
-      dateSlots.add(`${record.date}_${record.timeSlot}`)
-    })
-    return Array.from(dateSlots).map(key => {
-      const [date, timeSlot] = key.split('_')
-      return { date, timeSlot }
-    }).sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date)
-      return a.timeSlot.localeCompare(b.timeSlot)
-    })
-  }
-
-  // 检查某个日期时段是否有记录
-  const getSlotStats = (date: string, timeSlot: string) => {
-    const slotRecords = supervisionRecords.filter(r => r.date === date && r.timeSlot === timeSlot)
-    const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords).filter(r => r.date === date && r.timeSlot === timeSlot)
-    const avgScore = slotRecords.length > 0 
-      ? (slotRecords.reduce((sum, r) => sum + r.score, 0) / slotRecords.length).toFixed(1)
-      : '-'
-    return {
-      count: uniqueRecords.length,
-      avgScore
-    }
-  }
-
   // 获取指定年月的日历数据
   const getCalendarDays = () => {
     const days = []
@@ -304,35 +273,6 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
       })
     }
     return weekDates
-  }
-
-  const handleExportExcel = () => {
-    const date = selectedSummaryDate || currentDate
-    const timeSlot = selectedSummaryTimeSlot || currentTimeSlot
-    const displayTimeSlot = selectedSummaryTimeSlot ? formatTimeSlot(selectedSummaryTimeSlot) : currentDisplayTimeSlot
-    
-    const records = selectedSummaryDate && selectedSummaryTimeSlot 
-      ? getUniqueSupervisionRecords(supervisionRecords).filter(r => r.date === date && r.timeSlot === timeSlot)
-      : getUniqueSupervisionRecords(supervisionRecords)
-    
-    if (records.length === 0) {
-      alert('暂无督查记录可导出！')
-      return
-    }
-    
-    // 获取检查人姓名
-    let exportInspector = ''
-    if (records.length > 0) {
-      const inspectors = Array.from(new Set(records.map(r => r.inspector))).filter(Boolean)
-      exportInspector = inspectors.join('、')
-    }
-    
-    const filename = `督查记录表_${date}_${timeSlot}.xlsx`
-    exportSupervisionRecordsToExcel(records, filename, {
-      date: date,
-      timeSlot: displayTimeSlot,
-      inspector: exportInspector
-    })
   }
 
   // 格式化时间显示
@@ -871,10 +811,6 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
               const [year, month, day] = selectedDetailDate.split('-').map(Number)
               const selectedDate = new Date(year, month - 1, day)
               const isFuture = selectedDate > today
-              const hasMorningRecords = getUniqueSupervisionRecords(supervisionRecords).some(r => r.date === selectedDetailDate && r.timeSlot === '上午')
-              const hasAfternoonRecords = getUniqueSupervisionRecords(supervisionRecords).some(r => r.date === selectedDetailDate && r.timeSlot === '下午')
-              const hasAnyRecords = hasMorningRecords || hasAfternoonRecords
-              
               if (isFuture) {
                 return null
               }

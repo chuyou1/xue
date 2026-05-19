@@ -175,7 +175,7 @@ export interface SupervisionRecord {
   instructor: string
   inspector: string
   leaveVerified: boolean
-  violations: { name: string; type: string; photo?: File }[]
+  violations: { name: string; type: string; photo?: string }[]
   score: number
   status: 'draft' | 'submitted'
   createdAt: string
