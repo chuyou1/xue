@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import '../styles/ClassMonitor.css'
-import { User, getClassInfo, ClassInfo, saveAttendanceRecord, getAttendanceRecords, getTodayAttendanceByClass, AttendanceRecord as GlobalAttendanceRecord, LeaveStudentInfo, StudentNameInfo, SubmissionStage, addNotification } from '../data'
+import { User, getClassInfo, ClassInfo, AttendanceRecord as GlobalAttendanceRecord, LeaveStudentInfo, StudentNameInfo, SubmissionStage } from '../data'
+import { mockApi } from '../services/mockApi'
 
 interface ClassMonitorProps {
   user: User
@@ -86,19 +87,21 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
 
   // 检查今天是否已有初始提交
   useEffect(() => {
-    if (user.className) {
-      const todayRecords = getTodayAttendanceByClass(user.className)
-      const initialRecord = todayRecords.find(r => r.stage === 'initial')
-      if (initialRecord) {
-        setTodayRecordId(initialRecord.id)
-        // 填充已有数据
-        setClassroom(initialRecord.classroom)
-        setPresent(initialRecord.present)
-        setLeave(initialRecord.leave)
-        setLate(initialRecord.late || '')
-        setAbsent(initialRecord.absent || '')
+    const loadTodayRecord = async () => {
+      if (user.className) {
+        const todayRecords = await mockApi.attendance.getByClass(user.className)
+        const initialRecord = todayRecords.find(r => r.stage === 'initial')
+        if (initialRecord) {
+          setTodayRecordId(initialRecord.id)
+          setClassroom(initialRecord.classroom)
+          setPresent(initialRecord.present)
+          setLeave(initialRecord.leave)
+          setLate(initialRecord.late || '')
+          setAbsent(initialRecord.absent || '')
+        }
       }
     }
+    loadTodayRecord()
   }, [user.className])
 
   useEffect(() => {
@@ -154,29 +157,32 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     }
   }, [])
 
-  // 从全局存储加载历史记录
+  // 从API加载历史记录
   useEffect(() => {
-    if (user.className) {
-      const allRecords = getAttendanceRecords()
-      const classRecords = allRecords
-        .filter(r => r.className === user.className && r.source === 'classMonitor')
-        .map(r => ({
-          id: r.id,
-          date: r.date,
-          timeSlot: r.timeSlot,
-          classroom: r.classroom,
-          present: r.present,
-          leave: r.leave,
-          late: r.late,
-          absent: r.absent,
-          submittedAt: r.submittedAt,
-          stage: r.stage,
-          leaveStudents: r.leaveStudents,
-          lateStudents: r.lateStudents,
-          absentStudents: r.absentStudents
-        }))
-      setAttendanceRecords(classRecords)
+    const loadAttendanceRecords = async () => {
+      if (user.className) {
+        const allRecords = await mockApi.attendance.getAll()
+        const classRecords = allRecords
+          .filter(r => r.className === user.className && r.source === 'classMonitor')
+          .map(r => ({
+            id: r.id,
+            date: r.date,
+            timeSlot: r.timeSlot,
+            classroom: r.classroom,
+            present: r.present,
+            leave: r.leave,
+            late: r.late,
+            absent: r.absent,
+            submittedAt: r.submittedAt,
+            stage: r.stage,
+            leaveStudents: r.leaveStudents,
+            lateStudents: r.lateStudents,
+            absentStudents: r.absentStudents
+          }))
+        setAttendanceRecords(classRecords)
+      }
     }
+    loadAttendanceRecords()
   }, [user.className])
 
   // 当请假人数变化时，初始化学生数组
@@ -408,33 +414,27 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
   }
 
   // 提交考勤（带或不带特殊情况说明）
-  const submitAttendance = (stage: SubmissionStage) => {
+  const submitAttendance = async (stage: SubmissionStage) => {
     const leaveCount = parseInt(leave) || 0
     const lateCount = parseInt(late) || 0
     const absentCount = parseInt(absent) || 0
     const { timeSlot } = getTimeStatus()
     
-    // 准备请假学生信息
     const leaveStudentInfos: LeaveStudentInfo[] = leaveStudents.map(student => ({
       name: student.name,
       hasPhoto: !!student.photo,
       specialNote: specialNotes[student.name]
     }))
     
-    // 准备迟到学生信息
     const lateStudentInfos: StudentNameInfo[] = lateStudents.map(student => ({
       name: student.name
     }))
     
-    // 准备旷课学生信息
     const absentStudentInfos: StudentNameInfo[] = absentStudents.map(student => ({
       name: student.name
     }))
     
-    const recordId = Date.now().toString()
-    
-    const newRecord: AttendanceRecord = {
-      id: recordId,
+    const newRecord: Omit<GlobalAttendanceRecord, 'id'> = {
       date: currentTime.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-'),
       timeSlot,
       classroom,
@@ -446,54 +446,64 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
       stage: stage,
       leaveStudents: leaveCount > 0 ? leaveStudentInfos : undefined,
       lateStudents: lateCount > 0 ? lateStudentInfos : undefined,
-      absentStudents: absentCount > 0 ? absentStudentInfos : undefined
-    }
-    
-    // 保存到全局存储
-    const globalRecord: GlobalAttendanceRecord = {
-      ...newRecord,
+      absentStudents: absentCount > 0 ? absentStudentInfos : undefined,
       className: user.className || '未知班级',
       instructor: classInfo?.instructor || '未知',
       source: 'classMonitor'
     }
-    saveAttendanceRecord(globalRecord)
     
-    // 发送通知
-    const hasException = (lateCount > 0 || absentCount > 0)
-    if (hasException) {
-      let notificationType: 'attendance_update' | 'late_update' | 'absent_update' = 'attendance_update'
-      let message = ''
+    try {
+      const savedRecord = await mockApi.attendance.create(newRecord)
       
-      const parts: string[] = []
-      if (lateCount > 0) {
-        parts.push(`迟到${lateCount}人（${lateStudents.map(s => s.name).join('、')}）`)
+      const hasException = (lateCount > 0 || absentCount > 0)
+      if (hasException) {
+        const parts: string[] = []
+        if (lateCount > 0) {
+          parts.push(`迟到${lateCount}人（${lateStudents.map(s => s.name).join('、')}）`)
+        }
+        if (absentCount > 0) {
+          parts.push(`旷课${absentCount}人（${absentStudents.map(s => s.name).join('、')}）`)
+        }
+        const notificationType: 'attendance_update' | 'late_update' | 'absent_update' = 
+          lateCount > 0 && absentCount > 0 ? 'attendance_update' : (lateCount > 0 ? 'late_update' : 'absent_update')
+        const message = `${user.className} 提交考勤：${parts.join('，')}`
+        
+        await mockApi.notifications.create({
+          type: notificationType,
+          className: user.className || '未知班级',
+          message
+        })
       }
-      if (absentCount > 0) {
-        parts.push(`旷课${absentCount}人（${absentStudents.map(s => s.name).join('、')}）`)
-      }
-      notificationType = lateCount > 0 && absentCount > 0 ? 'attendance_update' : (lateCount > 0 ? 'late_update' : 'absent_update')
-      message = `${user.className} 提交考勤：${parts.join('，')}`
       
-      addNotification({
-        type: notificationType,
-        className: user.className || '未知班级',
-        message
-      })
+      setTodayRecordId(savedRecord.id)
+      setAttendanceRecords([{
+        id: savedRecord.id,
+        date: savedRecord.date,
+        timeSlot: savedRecord.timeSlot,
+        classroom: savedRecord.classroom,
+        present: savedRecord.present,
+        leave: savedRecord.leave,
+        late: savedRecord.late,
+        absent: savedRecord.absent,
+        submittedAt: savedRecord.submittedAt,
+        stage: savedRecord.stage,
+        leaveStudents: savedRecord.leaveStudents,
+        lateStudents: savedRecord.lateStudents,
+        absentStudents: savedRecord.absentStudents
+      }, ...attendanceRecords])
+      
+      setShowSpecialNoteModal(false)
+      setShowSuccessModal(true)
+      
+      if (successModalTimerRef.current) {
+        clearTimeout(successModalTimerRef.current)
+      }
+      successModalTimerRef.current = setTimeout(() => {
+        setShowSuccessModal(false)
+      }, 3000)
+    } catch (err) {
+      setValidationError('提交失败，请重试')
     }
-    
-    setTodayRecordId(recordId)
-    setAttendanceRecords([newRecord, ...attendanceRecords])
-    
-    setShowSpecialNoteModal(false)
-    setShowSuccessModal(true)
-    
-    // 3秒后自动关闭
-    if (successModalTimerRef.current) {
-      clearTimeout(successModalTimerRef.current)
-    }
-    successModalTimerRef.current = setTimeout(() => {
-      setShowSuccessModal(false)
-    }, 3000)
   }
 
   const formatTime = (date: Date) => {

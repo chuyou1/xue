@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import '../styles/VicePresident.css'
-import { User, getSupervisionRecords, SupervisionRecord, classroomsByFloor, getUniqueSupervisionRecords, getNotifications, Notification, markNotificationAsRead, getTodayAnomalyCount, getAnomalyRecordsByDate, AnomalyRecord, getAttendanceRecords, AttendanceRecord, classes, getUniqueAttendanceRecords } from '../data'
+import { User, SupervisionRecord, classroomsByFloor, getUniqueSupervisionRecords, Notification, AnomalyRecord, AttendanceRecord, classes, getUniqueAttendanceRecords, users } from '../data'
+import { mockApi } from '../services/mockApi'
 
 interface VicePresidentProps {
   user: User
@@ -97,13 +98,20 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
     return () => clearInterval(timer)
   }, [])
 
-  const loadData = () => {
-    setSupervisionRecords(getSupervisionRecords())
-    setAttendanceRecords(getAttendanceRecords())
-    setNotifications(getNotifications())
-    setAnomalyCount(getTodayAnomalyCount())
+  const loadData = async () => {
     const date = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
-    setTodayAnomalyRecords(getAnomalyRecordsByDate(date))
+    const [supervision, attendance, notifications, anomalyCount, anomalies] = await Promise.all([
+      mockApi.supervision.getAll(),
+      mockApi.attendance.getAll(),
+      mockApi.notifications.getAll(),
+      mockApi.anomalies.getTodayCount(),
+      mockApi.anomalies.getByDate(date)
+    ])
+    setSupervisionRecords(supervision)
+    setAttendanceRecords(attendance)
+    setNotifications(notifications)
+    setAnomalyCount(anomalyCount)
+    setTodayAnomalyRecords(anomalies)
   }
 
   // 格式化通知时间
@@ -132,9 +140,10 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
   }
 
   // 关闭通知
-  const handleCloseNotification = (id: string) => {
-    markNotificationAsRead(id)
-    setNotifications(getNotifications())
+  const handleCloseNotification = async (id: string) => {
+    await mockApi.notifications.markAsRead(id)
+    const updated = await mockApi.notifications.getAll()
+    setNotifications(updated)
   }
 
   // 刷新数据当切换标签时
@@ -1089,7 +1098,7 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
         {!showAnomalyDetail && activeTab === 'accounts' && (
           <div className="card">
             <div className="report-table">
-              <table>
+              <table className="standard-table">
                 <thead>
                   <tr>
                     <th>账号</th>
@@ -1099,42 +1108,19 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td>classMonitor1</td>
-                    <td>张三</td>
-                    <td>学委</td>
-                    <td>大数据2401</td>
-                  </tr>
-                  <tr>
-                    <td>classMonitor2</td>
-                    <td>李四</td>
-                    <td>学委</td>
-                    <td>电商2401</td>
-                  </tr>
-                  <tr>
-                    <td>secretary1</td>
-                    <td>王五</td>
-                    <td>学习部干事</td>
-                    <td>-</td>
-                  </tr>
-                  <tr>
-                    <td>secretary2</td>
-                    <td>赵六</td>
-                    <td>学习部干事</td>
-                    <td>-</td>
-                  </tr>
-                  <tr>
-                    <td>cadre1</td>
-                    <td>钱七</td>
-                    <td>学习部干部</td>
-                    <td>-</td>
-                  </tr>
-                  <tr>
-                    <td>vicePresident</td>
-                    <td>{user.name}</td>
-                    <td>学生会副会长</td>
-                    <td>-</td>
-                  </tr>
+                  {users.map((userItem, index) => (
+                    <tr key={index}>
+                      <td>{userItem.username}</td>
+                      <td>{userItem.name || '-'}</td>
+                      <td>
+                        {userItem.role === 'classMonitor' && '学委'}
+                        {userItem.role === 'secretary' && '学习部干事'}
+                        {userItem.role === 'cadre' && '学习部干部'}
+                        {userItem.role === 'vicePresident' && '学生会副会长'}
+                      </td>
+                      <td>{userItem.className || '-'}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

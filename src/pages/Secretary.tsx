@@ -3,22 +3,16 @@ import '../styles/Secretary.css'
 import { 
   User, 
   classroomsByFloor, 
-  getAttendanceByClassroom, 
   AttendanceRecord as GlobalAttendanceRecord, 
   classes, 
-  saveSupervisionRecord, 
   SupervisionRecord, 
-  getSupervisionRecords, 
-  isClassroomChecked, 
   getUniqueAttendanceRecords, 
   getUniqueSupervisionRecords, 
-  getNotifications, 
   Notification, 
-  markNotificationAsRead,
   AnomalyRecord,
-  AnomalyStudent,
-  saveAnomalyRecord
+  AnomalyStudent
 } from '../data'
+import { mockApi } from '../services/mockApi'
 import { useModal } from '../contexts/ModalContext'
 import { exportSupervisionRecordsToExcel } from '../utils/exportExcel'
 
@@ -109,16 +103,22 @@ function Secretary({ user, onLogout }: SecretaryProps) {
 
   // 初始化当前日期和时段
   useEffect(() => {
-    const now = new Date()
-    const date = now.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
-    const timeSlot = now.getHours() < 12 ? '上午' : '下午'
-    setCurrentDate(date)
-    setCurrentTimeSlot(timeSlot)
-    setCurrentDisplayTimeSlot(getDisplayTimeSlot())
-    
-    // 加载督查记录
-    setSupervisionRecords(getSupervisionRecords())
-    setNotifications(getNotifications())
+    const loadData = async () => {
+      const now = new Date()
+      const date = now.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
+      const timeSlot = now.getHours() < 12 ? '上午' : '下午'
+      setCurrentDate(date)
+      setCurrentTimeSlot(timeSlot)
+      setCurrentDisplayTimeSlot(getDisplayTimeSlot())
+      
+      const [supervision, notifications] = await Promise.all([
+        mockApi.supervision.getAll(),
+        mockApi.notifications.getAll()
+      ])
+      setSupervisionRecords(supervision)
+      setNotifications(notifications)
+    }
+    loadData()
   }, [])
 
   // 每秒更新时间
@@ -131,17 +131,24 @@ function Secretary({ user, onLogout }: SecretaryProps) {
 
   // 提交成功后刷新记录
   useEffect(() => {
-    if (activeTab === 'report') {
-      setSupervisionRecords(getSupervisionRecords())
+    const loadSupervisionRecords = async () => {
+      if (activeTab === 'report') {
+        const records = await mockApi.supervision.getAll()
+        setSupervisionRecords(records)
+      }
     }
+    loadSupervisionRecords()
   }, [activeTab])
 
   // 当选择教室时，加载该教室的考勤记录
   useEffect(() => {
-    if (selectedClassroom && currentDate && currentTimeSlot) {
-      const records = getAttendanceByClassroom(selectedClassroom.number, currentDate, currentTimeSlot)
-      setClassAttendanceRecords(records)
+    const loadAttendanceRecords = async () => {
+      if (selectedClassroom && currentDate && currentTimeSlot) {
+        const records = await mockApi.attendance.getByClassroom(selectedClassroom.number, currentDate, currentTimeSlot)
+        setClassAttendanceRecords(records)
+      }
     }
+    loadAttendanceRecords()
   }, [selectedClassroom, currentDate, currentTimeSlot])
 
   const toggleFloor = (floorName: string) => {
@@ -208,9 +215,10 @@ function Secretary({ user, onLogout }: SecretaryProps) {
   }
 
   // 关闭通知
-  const handleCloseNotification = (id: string) => {
-    markNotificationAsRead(id)
-    setNotifications(getNotifications())
+  const handleCloseNotification = async (id: string) => {
+    await mockApi.notifications.markAsRead(id)
+    const updated = await mockApi.notifications.getAll()
+    setNotifications(updated)
   }
 
   // 开始编辑模式
@@ -339,8 +347,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
   }
 
   // 保存编辑和异常记录
-  const saveEditing = (originalRecord: GlobalAttendanceRecord) => {
-    // 验证异常学生 - 只有请假需要照片
+  const saveEditing = async (originalRecord: GlobalAttendanceRecord) => {
     const validateStudents = (students: AnomalyStudent[], type: string, needPhoto: boolean = true) => {
       for (let i = 0; i < students.length; i++) {
         if (!students[i].name || students[i].name.trim() === '') {
@@ -366,14 +373,11 @@ function Secretary({ user, onLogout }: SecretaryProps) {
     if (editedData.leave > 0 && !validateStudents(leaveStudents, '请假', true)) return
     if (editedData.late > 0 && !validateStudents(lateStudents, '迟到', false)) return
     if (editedData.absent > 0 && !validateStudents(absentStudents, '旷课', false)) return
-    // 未在教室不需要验证学生信息
 
     const hasAnomaly = checkIsAnomaly()
 
     if (hasAnomaly) {
-      // 创建并保存异常记录
-      const anomalyRecord: AnomalyRecord = {
-        id: Date.now().toString(),
+      const anomalyRecord: Omit<AnomalyRecord, 'id'> = {
         date: currentDate,
         timeSlot: currentTimeSlot,
         classroom: selectedClassroom?.number || '',
@@ -393,13 +397,20 @@ function Secretary({ user, onLogout }: SecretaryProps) {
         hasAnomaly: true
       }
       
-      saveAnomalyRecord(anomalyRecord)
-      
-      showModal({
-        title: '成功',
-        message: '考勤编辑已保存，已记录异常数据！',
-        type: 'success'
-      })
+      try {
+        await mockApi.anomalies.create(anomalyRecord)
+        showModal({
+          title: '成功',
+          message: '考勤编辑已保存，已记录异常数据！',
+          type: 'success'
+        })
+      } catch (err) {
+        showModal({
+          title: '错误',
+          message: '保存失败，请重试',
+          type: 'warning'
+        })
+      }
     } else {
       showModal({
         title: '提示',
@@ -466,8 +477,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
     // 获取班级信息
     const classRecord = classAttendanceRecords[0]
     
-    const doSubmit = () => {
-      // 从学委考勤记录中提取信息
+    const doSubmit = async () => {
       let classAttendanceInfo
       if (classRecord) {
         classAttendanceInfo = {
@@ -479,9 +489,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
         }
       }
 
-      // 创建督查记录
-      const newRecord: SupervisionRecord = {
-        id: Date.now().toString(),
+      const newRecord: Omit<SupervisionRecord, 'id'> = {
         date: currentDate,
         timeSlot: currentTimeSlot,
         classroom: selectedClassroom.number,
@@ -496,20 +504,26 @@ function Secretary({ user, onLogout }: SecretaryProps) {
         classAttendance: classAttendanceInfo
       }
 
-      // 保存到全局存储
-      saveSupervisionRecord(newRecord)
-      
-      showModal({
-        title: '成功',
-        message: '督查记录提交成功！',
-        type: 'success'
-      })
-      
-      // 重置表单
-      setViolations([])
-      setLeaveVerified(false)
-      // 刷新记录 - 触发重新渲染，更新教室状态
-      setSupervisionRecords([...getSupervisionRecords()])
+      try {
+        await mockApi.supervision.create(newRecord)
+        
+        showModal({
+          title: '成功',
+          message: '督查记录提交成功！',
+          type: 'success'
+        })
+        
+        setViolations([])
+        setLeaveVerified(false)
+        const updated = await mockApi.supervision.getAll()
+        setSupervisionRecords(updated)
+      } catch (err) {
+        showModal({
+          title: '错误',
+          message: '提交失败，请重试',
+          type: 'warning'
+        })
+      }
     }
 
     if (!classRecord) {
@@ -616,7 +630,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                   {expandedFloor === floorName && (
                     <div className="classrooms-grid">
                       {rooms.map((room) => {
-                        const checked = isClassroomChecked(room, currentDate, currentTimeSlot)
+                        const checked = supervisionRecords.some(r => r.classroom === room && r.date === currentDate && r.timeSlot === currentTimeSlot)
                         return (
                           <div
                             key={room}

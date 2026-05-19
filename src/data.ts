@@ -6,6 +6,7 @@ export interface ClassInfo {
 }
 
 export interface User {
+  id?: string
   username: string
   password: string
   role: 'classMonitor' | 'secretary' | 'cadre' | 'vicePresident'

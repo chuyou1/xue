@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/Login.css'
-import { findUser, User } from '../data'
+import { User } from '../data'
+import { mockApi } from '../services/mockApi'
 
 interface LoginProps {
   onLogin: (user: User) => void
@@ -11,20 +12,22 @@ function Login({ onLogin }: LoginProps) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [, setLoading] = useState(false)
   const navigate = useNavigate()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    setLoading(true)
 
     if (!username || !password) {
       setError('请填写账号和密码')
+      setLoading(false)
       return
     }
 
-    const user = findUser(username, password)
-    
-    if (user) {
+    try {
+      const user = await mockApi.auth.login(username, password)
       onLogin(user)
       
       switch (user.role) {
@@ -41,8 +44,10 @@ function Login({ onLogin }: LoginProps) {
           navigate('/vice-president')
           break
       }
-    } else {
+    } catch (err) {
       setError('账号或密码错误')
+    } finally {
+      setLoading(false)
     }
   }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import '../styles/Cadre.css'
-import { User, getSupervisionRecords, SupervisionRecord, classroomsByFloor, getUniqueSupervisionRecords, getNotifications, Notification, markNotificationAsRead, getTodayAnomalyCount, getAnomalyRecordsByDate, AnomalyRecord, getAttendanceRecords, AttendanceRecord, classes, getUniqueAttendanceRecords } from '../data'
+import { User, SupervisionRecord, classroomsByFloor, getUniqueSupervisionRecords, Notification, AnomalyRecord, AttendanceRecord, classes, getUniqueAttendanceRecords } from '../data'
+import { mockApi } from '../services/mockApi'
 
 interface CadreProps {
   user: User
@@ -97,13 +98,20 @@ function Cadre({ user, onLogout }: CadreProps) {
     return () => clearInterval(timer)
   }, [])
 
-  const loadData = () => {
-    setSupervisionRecords(getSupervisionRecords())
-    setAttendanceRecords(getAttendanceRecords())
-    setNotifications(getNotifications())
-    setAnomalyCount(getTodayAnomalyCount())
+  const loadData = async () => {
     const date = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
-    setTodayAnomalyRecords(getAnomalyRecordsByDate(date))
+    const [supervision, attendance, notifications, anomalyCount, anomalies] = await Promise.all([
+      mockApi.supervision.getAll(),
+      mockApi.attendance.getAll(),
+      mockApi.notifications.getAll(),
+      mockApi.anomalies.getTodayCount(),
+      mockApi.anomalies.getByDate(date)
+    ])
+    setSupervisionRecords(supervision)
+    setAttendanceRecords(attendance)
+    setNotifications(notifications)
+    setAnomalyCount(anomalyCount)
+    setTodayAnomalyRecords(anomalies)
   }
 
   // 格式化通知时间
@@ -132,9 +140,10 @@ function Cadre({ user, onLogout }: CadreProps) {
   }
 
   // 关闭通知
-  const handleCloseNotification = (id: string) => {
-    markNotificationAsRead(id)
-    setNotifications(getNotifications())
+  const handleCloseNotification = async (id: string) => {
+    await mockApi.notifications.markAsRead(id)
+    const updated = await mockApi.notifications.getAll()
+    setNotifications(updated)
   }
 
   // 刷新数据当切换标签时

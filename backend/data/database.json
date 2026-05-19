@@ -1,0 +1,84 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "username": "class1",
+      "password": "$2a$10$EtBdXGH48lkRKuc1IneQ3eoBsafsKFstdrOwPtHRvIPw20ZaFoZbi",
+      "role": "classMonitor",
+      "className": "计科2201班",
+      "name": "张三"
+    },
+    {
+      "id": "2",
+      "username": "class2",
+      "password": "$2a$10$EtBdXGH48lkRKuc1IneQ3eoBsafsKFstdrOwPtHRvIPw20ZaFoZbi",
+      "role": "classMonitor",
+      "className": "计科2202班",
+      "name": "李四"
+    },
+    {
+      "id": "3",
+      "username": "secretary",
+      "password": "$2a$10$EtBdXGH48lkRKuc1IneQ3eoBsafsKFstdrOwPtHRvIPw20ZaFoZbi",
+      "role": "secretary",
+      "name": "王五"
+    },
+    {
+      "id": "4",
+      "username": "cadre",
+      "password": "$2a$10$EtBdXGH48lkRKuc1IneQ3eoBsafsKFstdrOwPtHRvIPw20ZaFoZbi",
+      "role": "cadre",
+      "name": "赵六"
+    },
+    {
+      "id": "5",
+      "username": "vp",
+      "password": "$2a$10$EtBdXGH48lkRKuc1IneQ3eoBsafsKFstdrOwPtHRvIPw20ZaFoZbi",
+      "role": "vicePresident",
+      "name": "钱七"
+    }
+  ],
+  "classes": [
+    {
+      "id": "1",
+      "name": "计科2201班",
+      "instructor": "李老师",
+      "department": "计算机科学与技术"
+    },
+    {
+      "id": "2",
+      "name": "计科2202班",
+      "instructor": "王老师",
+      "department": "计算机科学与技术"
+    },
+    {
+      "id": "3",
+      "name": "计科2203班",
+      "instructor": "张老师",
+      "department": "计算机科学与技术"
+    },
+    {
+      "id": "4",
+      "name": "计科2204班",
+      "instructor": "刘老师",
+      "department": "计算机科学与技术"
+    },
+    {
+      "id": "5",
+      "name": "计科2301班",
+      "instructor": "陈老师",
+      "department": "计算机科学与技术"
+    },
+    {
+      "id": "6",
+      "name": "计科2302班",
+      "instructor": "杨老师",
+      "department": "计算机科学与技术"
+    }
+  ],
+  "attendance": [],
+  "supervision": [],
+  "notifications": [],
+  "anomalies": [],
+  "images": []
+}
