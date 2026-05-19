@@ -1,6 +1,24 @@
 import { useState, useEffect } from 'react'
 import '../styles/Secretary.css'
-import { User, classroomsByFloor, getAttendanceByClassroom, AttendanceRecord as GlobalAttendanceRecord, classes, saveSupervisionRecord, SupervisionRecord, getSupervisionRecords, isClassroomChecked, getUniqueAttendanceRecords, getUniqueSupervisionRecords } from '../data'
+import { 
+  User, 
+  classroomsByFloor, 
+  getAttendanceByClassroom, 
+  AttendanceRecord as GlobalAttendanceRecord, 
+  classes, 
+  saveSupervisionRecord, 
+  SupervisionRecord, 
+  getSupervisionRecords, 
+  isClassroomChecked, 
+  getUniqueAttendanceRecords, 
+  getUniqueSupervisionRecords, 
+  getNotifications, 
+  Notification, 
+  markNotificationAsRead,
+  AnomalyRecord,
+  AnomalyStudent,
+  saveAnomalyRecord
+} from '../data'
 import { useModal } from '../contexts/ModalContext'
 import { exportSupervisionRecordsToExcel } from '../utils/exportExcel'
 
@@ -29,8 +47,39 @@ function Secretary({ user, onLogout }: SecretaryProps) {
   const [currentDisplayTimeSlot, setCurrentDisplayTimeSlot] = useState('')
   const [classAttendanceRecords, setClassAttendanceRecords] = useState<GlobalAttendanceRecord[]>([])
   const [supervisionRecords, setSupervisionRecords] = useState<SupervisionRecord[]>([])
+  const [currentTime, setCurrentTime] = useState(new Date())
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  
+  // 编辑模式相关状态
+  const [isEditing, setIsEditing] = useState(false)
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null)
+  const [editedData, setEditedData] = useState({
+    present: 0,
+    leave: 0,
+    late: 0,
+    absent: 0,
+    notInClassroom: 0
+  })
+  const [originalData, setOriginalData] = useState({
+    present: 0,
+    leave: 0,
+    late: 0,
+    absent: 0
+  })
+  const [leaveStudents, setLeaveStudents] = useState<AnomalyStudent[]>([])
+  const [lateStudents, setLateStudents] = useState<AnomalyStudent[]>([])
+  const [absentStudents, setAbsentStudents] = useState<AnomalyStudent[]>([])
+  const [notInClassroomStudents, setNotInClassroomStudents] = useState<AnomalyStudent[]>([])
+  const [notInClassroomReason, setNotInClassroomReason] = useState('')
 
-  // 获取显示的时段信息（星期几第几节）
+  // 获取根据时间变化的问候语
+  const getGreeting = () => {
+    const hour = currentTime.getHours()
+    if (hour < 12) return '早上好'
+    if (hour < 18) return '下午好'
+    return '晚上好'
+  }
+
   // 违纪类型中文映射
   const violationTypeMap: { [key: string]: string } = {
     'sleep': '睡觉',
@@ -44,7 +93,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
 
   const getDisplayTimeSlot = () => {
     const now = new Date()
-    const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+    const dayNames = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
     const dayName = dayNames[now.getDay()]
     const hour = now.getHours()
     let period = ''
@@ -69,6 +118,15 @@ function Secretary({ user, onLogout }: SecretaryProps) {
     
     // 加载督查记录
     setSupervisionRecords(getSupervisionRecords())
+    setNotifications(getNotifications())
+  }, [])
+
+  // 每秒更新时间
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date())
+    }, 1000)
+    return () => clearInterval(timer)
   }, [])
 
   // 提交成功后刷新记录
@@ -95,6 +153,8 @@ function Secretary({ user, onLogout }: SecretaryProps) {
     setActiveTab('detail')
     setViolations([])
     setLeaveVerified(false)
+    setIsEditing(false)
+    setEditingRecordId(null)
   }
 
   const addViolation = () => {
@@ -122,6 +182,235 @@ function Secretary({ user, onLogout }: SecretaryProps) {
     setViolations(violations.filter((_, i) => i !== index))
   }
 
+  // 格式化通知时间
+  const formatNotificationTime = (timeString: string) => {
+    const date = new Date(timeString)
+    return date.toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  // 获取通知图标
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'attendance_update':
+        return '📋'
+      case 'late_update':
+        return '⏰'
+      case 'absent_update':
+        return '📝'
+      default:
+        return '🔔'
+    }
+  }
+
+  // 关闭通知
+  const handleCloseNotification = (id: string) => {
+    markNotificationAsRead(id)
+    setNotifications(getNotifications())
+  }
+
+  // 开始编辑模式
+  const startEditing = (record: GlobalAttendanceRecord) => {
+    const leave = parseInt(record.leave) || 0
+    const late = parseInt(record.late) || 0
+    const absent = parseInt(record.absent) || 0
+    const present = parseInt(record.present) || 0
+    
+    setOriginalData({
+      present,
+      leave,
+      late,
+      absent
+    })
+    
+    setEditedData({
+      present,
+      leave,
+      late,
+      absent,
+      notInClassroom: 0
+    })
+    
+    setLeaveStudents([])
+    setLateStudents([])
+    setAbsentStudents([])
+    setNotInClassroomStudents([])
+    setNotInClassroomReason('')
+    
+    setEditingRecordId(record.id)
+    setIsEditing(true)
+  }
+
+  // 取消编辑
+  const cancelEditing = () => {
+    setIsEditing(false)
+    setEditingRecordId(null)
+  }
+
+  // 添加异常学生
+  const addAnomalyStudent = (setter: React.Dispatch<React.SetStateAction<AnomalyStudent[]>>) => {
+    setter(prev => [...prev, { name: '', hasPhoto: false }])
+  }
+
+  // 更新异常学生
+  const updateAnomalyStudent = (
+    setter: React.Dispatch<React.SetStateAction<AnomalyStudent[]>>,
+    index: number,
+    field: string,
+    value: any
+  ) => {
+    setter(prev => {
+      const newStudents = [...prev]
+      newStudents[index] = { ...newStudents[index], [field]: value }
+      return newStudents
+    })
+  }
+
+  // 删除异常学生
+  const removeAnomalyStudent = (
+    setter: React.Dispatch<React.SetStateAction<AnomalyStudent[]>>,
+    index: number
+  ) => {
+    setter(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // 处理异常学生照片上传
+  const handleAnomalyPhotoChange = (
+    setter: React.Dispatch<React.SetStateAction<AnomalyStudent[]>>,
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0]
+    setter(prev => {
+      const newStudents = [...prev]
+      newStudents[index] = { 
+        ...newStudents[index], 
+        photo: file,
+        hasPhoto: !!file
+      }
+      return newStudents
+    })
+  }
+
+  // 检查是否为异常编辑
+  const checkIsAnomaly = () => {
+    const presentChanged = editedData.present !== originalData.present
+    const leaveChanged = editedData.leave !== originalData.leave
+    const lateChanged = editedData.late !== originalData.late
+    const absentChanged = editedData.absent !== originalData.absent
+    const notInClassroomHasCount = editedData.notInClassroom >= 1
+    
+    return presentChanged || leaveChanged || lateChanged || absentChanged || notInClassroomHasCount
+  }
+
+  // 确定异常类型
+  const getAnomalyType = () => {
+    if (editedData.notInClassroom >= 1) return 'not_in_classroom'
+    if (editedData.leave !== originalData.leave) return 'leave_change'
+    if (editedData.late !== originalData.late) return 'late_change'
+    if (editedData.absent !== originalData.absent) return 'absent_change'
+    if (editedData.present !== originalData.present) return 'present_change'
+    return 'not_in_classroom'
+  }
+
+  // 生成原因描述
+  const generateReason = () => {
+    const reasons: string[] = []
+    if (editedData.leave !== originalData.leave) {
+      reasons.push(`请假人数从 ${originalData.leave} 变更为 ${editedData.leave}`)
+    }
+    if (editedData.late !== originalData.late) {
+      reasons.push(`迟到人数从 ${originalData.late} 变更为 ${editedData.late}`)
+    }
+    if (editedData.absent !== originalData.absent) {
+      reasons.push(`旷课人数从 ${originalData.absent} 变更为 ${editedData.absent}`)
+    }
+    if (editedData.present !== originalData.present) {
+      reasons.push(`实到人数从 ${originalData.present} 变更为 ${editedData.present}`)
+    }
+    if (editedData.notInClassroom >= 1) {
+      reasons.push(`未在教室 ${editedData.notInClassroom} 人，原因：${notInClassroomReason || '未说明'}`)
+    }
+    return reasons.join('；')
+  }
+
+  // 保存编辑和异常记录
+  const saveEditing = (originalRecord: GlobalAttendanceRecord) => {
+    // 验证异常学生 - 只有请假需要照片
+    const validateStudents = (students: AnomalyStudent[], type: string, needPhoto: boolean = true) => {
+      for (let i = 0; i < students.length; i++) {
+        if (!students[i].name || students[i].name.trim() === '') {
+          showModal({
+            title: '提示',
+            message: `${type}学生${i + 1}的姓名未填写！`,
+            type: 'warning'
+          })
+          return false
+        }
+        if (needPhoto && !students[i].hasPhoto) {
+          showModal({
+            title: '提示',
+            message: `请上传${type}学生${students[i].name}的照片！`,
+            type: 'warning'
+          })
+          return false
+        }
+      }
+      return true
+    }
+
+    if (editedData.leave > 0 && !validateStudents(leaveStudents, '请假', true)) return
+    if (editedData.late > 0 && !validateStudents(lateStudents, '迟到', false)) return
+    if (editedData.absent > 0 && !validateStudents(absentStudents, '旷课', false)) return
+    // 未在教室不需要验证学生信息
+
+    const hasAnomaly = checkIsAnomaly()
+
+    if (hasAnomaly) {
+      // 创建并保存异常记录
+      const anomalyRecord: AnomalyRecord = {
+        id: Date.now().toString(),
+        date: currentDate,
+        timeSlot: currentTimeSlot,
+        classroom: selectedClassroom?.number || '',
+        className: originalRecord.className,
+        instructor: originalRecord.instructor,
+        inspector: inspector,
+        type: getAnomalyType(),
+        originalData,
+        editedData,
+        leaveStudents,
+        lateStudents,
+        absentStudents,
+        notInClassroomStudents,
+        notInClassroomReason,
+        reason: generateReason(),
+        createdAt: new Date().toISOString(),
+        hasAnomaly: true
+      }
+      
+      saveAnomalyRecord(anomalyRecord)
+      
+      showModal({
+        title: '成功',
+        message: '考勤编辑已保存，已记录异常数据！',
+        type: 'success'
+      })
+    } else {
+      showModal({
+        title: '提示',
+        message: '数据无变化，无需保存。',
+        type: 'info'
+      })
+    }
+    
+    cancelEditing()
+  }
+
   const calculateScore = () => {
     let score = 100
     violations.forEach(v => {
@@ -139,8 +428,8 @@ function Secretary({ user, onLogout }: SecretaryProps) {
         title: '提示',
         message: '请先选择教室！',
         type: 'warning'
-      });
-      return;
+      })
+      return
     }
 
     if (!inspector) {
@@ -148,34 +437,34 @@ function Secretary({ user, onLogout }: SecretaryProps) {
         title: '提示',
         message: '请填写检查人姓名！',
         type: 'warning'
-      });
-      return;
+      })
+      return
     }
 
     // 检查违纪记录
     for (let i = 0; i < violations.length; i++) {
-      const v = violations[i];
+      const v = violations[i]
       if (!v.name || v.name.trim() === '') {
         showModal({
           title: '提示',
           message: `第 ${i + 1} 条违纪记录的学生姓名未填写！`,
           type: 'warning'
-        });
-        return;
+        })
+        return
       }
       // 检查是否上传了违纪照片
       if (!v.hasPhoto) {
         showModal({
           title: '警告',
-          message: `请上传第 ${i + 1} 条违纪记录（${v.name}）的违纪情况图片！`,
+          message: `请上传第 ${i + 1} 条违纪记录（${v.name}）的违纪情况照片！`,
           type: 'warning'
-        });
-        return;
+        })
+        return
       }
     }
 
     // 获取班级信息
-    const classRecord = classAttendanceRecords[0];
+    const classRecord = classAttendanceRecords[0]
     
     const doSubmit = () => {
       // 从学委考勤记录中提取信息
@@ -205,23 +494,23 @@ function Secretary({ user, onLogout }: SecretaryProps) {
         status: 'submitted',
         createdAt: new Date().toISOString(),
         classAttendance: classAttendanceInfo
-      };
+      }
 
       // 保存到全局存储
-      saveSupervisionRecord(newRecord);
+      saveSupervisionRecord(newRecord)
       
       showModal({
         title: '成功',
         message: '督查记录提交成功！',
         type: 'success'
-      });
+      })
       
       // 重置表单
-      setViolations([]);
-      setLeaveVerified(false);
+      setViolations([])
+      setLeaveVerified(false)
       // 刷新记录 - 触发重新渲染，更新教室状态
-      setSupervisionRecords([...getSupervisionRecords()]);
-    };
+      setSupervisionRecords([...getSupervisionRecords()])
+    }
 
     if (!classRecord) {
       showModal({
@@ -230,40 +519,51 @@ function Secretary({ user, onLogout }: SecretaryProps) {
         type: 'warning',
         showCancel: true,
         onConfirm: doSubmit
-      });
+      })
     } else {
-      doSubmit();
+      doSubmit()
     }
-  };
-
-  const handleExportExcel = () => {
-    const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords);
-    if (uniqueRecords.length === 0) {
-      showModal({
-        title: '提示',
-        message: '暂无督查记录可导出！',
-        type: 'warning'
-      });
-      return;
-    }
-    
-    const filename = `督查记录表_${currentDate}_${currentTimeSlot}.xlsx`;
-    exportSupervisionRecordsToExcel(uniqueRecords, filename, {
-      date: currentDate,
-      timeSlot: currentDisplayTimeSlot,
-      inspector: inspector || '未填写'
-    });
-  };
+  }
 
   return (
     <div className="page-container">
       <header className="header">
         <div className="header-content">
-          <h2>计科院学风建设督查系统 - 学习部干事</h2>
-          {user.name && <span style={{ color: '#666', marginRight: '16px' }}>欢迎，{user.name}</span>}
-          <button className="logout-btn" onClick={onLogout}>退出登录</button>
+          {user.name && <h2>{getGreeting()}，{user.name}</h2>}
+          <button className="logout-btn" onClick={onLogout}>退出</button>
         </div>
       </header>
+
+      {/* 通知区域 */}
+      {notifications.length > 0 && (
+        <div className="notification-container">
+          <div className="notification-list">
+            {notifications.map((notification) => (
+              <div 
+                key={notification.id} 
+                className={`notification-item ${!notification.isRead ? 'unread' : ''}`}
+              >
+                <span className="notification-icon">
+                  {getNotificationIcon(notification.type)}
+                </span>
+                <div className="notification-content">
+                  <div className="notification-class">{notification.className}</div>
+                  <div className="notification-message">{notification.message}</div>
+                  <div className="notification-time">
+                    {formatNotificationTime(notification.timestamp)}
+                  </div>
+                </div>
+                <button 
+                  className="notification-close"
+                  onClick={() => handleCloseNotification(notification.id)}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="tabs">
         <button
@@ -293,12 +593,13 @@ function Secretary({ user, onLogout }: SecretaryProps) {
           <div className="card">
             <div className="floor-controls">
               <div className="form-group">
-                <label>督查检查人</label>
+                <label style={{ fontSize: '16px' }}>督查检查人</label>
                 <input
                   type="text"
                   value={inspector}
                   onChange={(e) => setInspector(e.target.value)}
                   placeholder="请输入检查人姓名"
+                  style={{ height: '32px', fontSize: '16px' }}
                 />
               </div>
             </div>
@@ -310,7 +611,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                     className={`floor-header ${expandedFloor === floorName ? 'expanded' : ''}`}
                     onClick={() => toggleFloor(floorName)}
                   >
-                    <span className="floor-name">{floorName}</span>
+                    <span className="floor-name" style={{ fontSize: '16px' }}>{floorName}</span>
                   </div>
                   {expandedFloor === floorName && (
                     <div className="classrooms-grid">
@@ -326,10 +627,10 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                               borderColor: checked ? '#4caf50' : '#e0e0e0'
                             }}
                           >
-                            {room}
+                            <span style={{ fontSize: '16px' }}>{room}</span>
                             <span 
                               className="status-badge" 
-                              style={{ color: checked ? '#4caf50' : '#999', fontWeight: checked ? 'bold' : 'normal' }}
+                              style={{ color: checked ? '#4caf50' : '#999', fontWeight: checked ? 'bold' : 'normal', fontSize: '16px' }}
                             >
                               {checked ? '已查' : '未查'}
                             </span>
@@ -337,10 +638,10 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                         )
                       })}
                       {(floorName === '9F' || floorName === '6-8F') && (
-                        <button className="add-classroom-btn">+ 新增教室</button>
+                        <button className="add-classroom-btn" style={{ fontSize: '16px', height: '32px' }}>+ 新增教室</button>
                       )}
                       {rooms.length === 0 && (
-                        <div className="empty-state">该楼层可添加教室</div>
+                        <div className="empty-state" style={{ fontSize: '16px' }}>该教室可添加</div>
                       )}
                     </div>
                   )}
@@ -349,7 +650,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
             </div>
             
             <div className="leave-verified-section-bottom">
-              <label className="checkbox-label">
+              <label className="checkbox-label" style={{ fontSize: '16px' }}>
                 <input
                   type="checkbox"
                   checked={leaveVerified}
@@ -363,72 +664,290 @@ function Secretary({ user, onLogout }: SecretaryProps) {
 
         {activeTab === 'detail' && selectedClassroom && (
           <div className="card">
-            <h3>{selectedClassroom.number} - 考勤详情</h3>
+            <h3 style={{ fontSize: '16px' }}>{selectedClassroom.number} - 考勤详情</h3>
             <div className="section">
               <div className="info-row" style={{ marginBottom: '16px' }}>
-                <span>日期：{currentDate}</span>
-                <span>时段：{currentTimeSlot}</span>
+                <span style={{ fontSize: '16px' }}>日期：{currentDate}</span>
+                <span style={{ fontSize: '16px' }}>时段：{currentTimeSlot}</span>
               </div>
             </div>
             
             <div className="section">
-              <h4>学委考勤核对</h4>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h4 style={{ fontSize: '16px', margin: 0 }}>学委考勤核对</h4>
+                {(() => {
+                  const uniqueRecords = getUniqueAttendanceRecords(classAttendanceRecords)
+                  if (uniqueRecords.length > 0 && !isEditing) {
+                    return (
+                      <button
+                        className="secondary-btn"
+                        style={{
+                          fontSize: '16px',
+                          height: '32px',
+                          padding: '0 12px'
+                        }}
+                        onClick={() => startEditing(uniqueRecords[0])}
+                      >
+                        编辑
+                      </button>
+                    )
+                  }
+                  return null
+                })()}
+              </div>
               <div className="attendance-preview">
                 {(() => {
-                  const uniqueRecords = getUniqueAttendanceRecords(classAttendanceRecords);
+                  const uniqueRecords = getUniqueAttendanceRecords(classAttendanceRecords)
                   if (uniqueRecords.length === 0) {
                     return (
                       <div className="info-row" style={{ color: '#999' }}>
                         暂无该教室考勤数据
                       </div>
-                    );
+                    )
                   }
                   return uniqueRecords.map((record) => {
-                    const classInfo = classes.find(c => c.name === record.className);
-                    const leave = parseInt(record.leave) || 0;
-                    const late = parseInt(record.late) || 0;
-                    const absent = parseInt(record.absent) || 0;
+                    const classInfo = classes.find(c => c.name === record.className)
+                    const leave = parseInt(record.leave) || 0
+                    const late = parseInt(record.late) || 0
+                    const absent = parseInt(record.absent) || 0
+                    const isCurrentlyEditing = isEditing && editingRecordId === record.id
                     
                     return (
                       <div key={record.id} className="attendance-record-card">
-                        <div className="record-header">
-                          <span className="class-name">{record.className}</span>
-                          <span className="instructor">辅导员：{record.instructor}</span>
-                        </div>
-                        <div className="record-details">
-                          <div className="detail-item">
-                            <span className="label">应到：</span>
-                            <span className="value">{classInfo?.count || (parseInt(record.present) || 0) + leave}</span>
+                        
+                        {isCurrentlyEditing ? (
+                          // 编辑模式
+                          <div>
+                            <div className="record-header">
+                              <span className="class-name" style={{ fontSize: '16px' }}>{record.className}</span>
+                              <span className="instructor" style={{ fontSize: '16px' }}>辅导员：{record.instructor}</span>
+                            </div>
+                            
+                            <div className="form-group" style={{ marginTop: '16px' }}>
+                              <label style={{ fontSize: '16px' }}>实到人数</label>
+                              <input
+                                type="number"
+                                value={editedData.present}
+                                onChange={(e) => setEditedData({...editedData, present: parseInt(e.target.value) || 0})}
+                                min="0"
+                                style={{ height: '32px' }}
+                              />
+                            </div>
+                            
+                            <div className="form-group">
+                              <label style={{ fontSize: '16px' }}>请假人数</label>
+                              <input
+                                type="number"
+                                value={editedData.leave}
+                                onChange={(e) => {
+                                  const newVal = parseInt(e.target.value) || 0
+                                  setEditedData({...editedData, leave: newVal})
+                                }}
+                                min="0"
+                                style={{ height: '32px' }}
+                              />
+                              {editedData.leave >= 1 && (
+                                <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                                  <h5 style={{ marginBottom: '8px', fontSize: '16px' }}>请假学生信息</h5>
+                                  {leaveStudents.map((student, index) => (
+                                    <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '8px', alignItems: 'center' }}>
+                                      <input
+                                        type="text"
+                                        placeholder="学生姓名"
+                                        value={student.name}
+                                        onChange={(e) => updateAnomalyStudent(setLeaveStudents, index, 'name', e.target.value)}
+                                        style={{ flex: 1, padding: '6px', height: '32px', fontSize: '16px' }}
+                                      />
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => handleAnomalyPhotoChange(setLeaveStudents, index, e)}
+                                        style={{ flex: 1, height: '32px' }}
+                                      />
+                                      <button
+                                        className="remove-btn"
+                                        onClick={() => removeAnomalyStudent(setLeaveStudents, index)}
+                                      >
+                                        删除
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    className="secondary-btn"
+                                    onClick={() => addAnomalyStudent(setLeaveStudents)}
+                                    style={{ fontSize: '16px', height: '32px', padding: '0 12px', marginTop: '8px' }}
+                                  >
+                                    + 添加学生
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="form-group">
+                              <label style={{ fontSize: '16px' }}>迟到人数</label>
+                              <input
+                                type="number"
+                                value={editedData.late}
+                                onChange={(e) => {
+                                  const newVal = parseInt(e.target.value) || 0
+                                  setEditedData({...editedData, late: newVal})
+                                }}
+                                min="0"
+                                style={{ height: '32px', fontSize: '16px' }}
+                              />
+                              {editedData.late >= 1 && (
+                                <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                                  <h5 style={{ marginBottom: '8px', fontSize: '16px' }}>迟到学生信息</h5>
+                                  {lateStudents.map((student, index) => (
+                                    <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '8px', alignItems: 'center' }}>
+                                      <input
+                                        type="text"
+                                        placeholder="学生姓名"
+                                        value={student.name}
+                                        onChange={(e) => updateAnomalyStudent(setLateStudents, index, 'name', e.target.value)}
+                                        style={{ flex: 1, padding: '6px', height: '32px', fontSize: '16px' }}
+                                      />
+                                      <button
+                                        className="remove-btn"
+                                        onClick={() => removeAnomalyStudent(setLateStudents, index)}
+                                        style={{ fontSize: '16px', height: '32px' }}
+                                      >
+                                        删除
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    className="secondary-btn"
+                                    onClick={() => addAnomalyStudent(setLateStudents)}
+                                    style={{ fontSize: '16px', height: '32px', padding: '0 12px', marginTop: '8px' }}
+                                  >
+                                    + 添加学生
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="form-group">
+                              <label style={{ fontSize: '16px' }}>旷课人数</label>
+                              <input
+                                type="number"
+                                value={editedData.absent}
+                                onChange={(e) => {
+                                  const newVal = parseInt(e.target.value) || 0
+                                  setEditedData({...editedData, absent: newVal})
+                                }}
+                                min="0"
+                                style={{ height: '32px', fontSize: '16px' }}
+                              />
+                              {editedData.absent >= 1 && (
+                                <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                                  <h5 style={{ marginBottom: '8px', fontSize: '16px' }}>旷课学生信息</h5>
+                                  {absentStudents.map((student, index) => (
+                                    <div key={index} style={{ display: 'flex', gap: '10px', marginBottom: '8px', alignItems: 'center' }}>
+                                      <input
+                                        type="text"
+                                        placeholder="学生姓名"
+                                        value={student.name}
+                                        onChange={(e) => updateAnomalyStudent(setAbsentStudents, index, 'name', e.target.value)}
+                                        style={{ flex: 1, padding: '6px', height: '32px', fontSize: '16px' }}
+                                      />
+                                      <button
+                                        className="remove-btn"
+                                        onClick={() => removeAnomalyStudent(setAbsentStudents, index)}
+                                        style={{ fontSize: '16px', height: '32px' }}
+                                      >
+                                        删除
+                                      </button>
+                                    </div>
+                                  ))}
+                                  <button
+                                    className="secondary-btn"
+                                    onClick={() => addAnomalyStudent(setAbsentStudents)}
+                                    style={{ fontSize: '16px', height: '32px', padding: '0 12px', marginTop: '8px' }}
+                                  >
+                                    + 添加学生
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="form-group">
+                              <label style={{ fontSize: '16px' }}>未在教室人数</label>
+                              <input
+                                type="number"
+                                value={editedData.notInClassroom}
+                                onChange={(e) => {
+                                  const newVal = parseInt(e.target.value) || 0
+                                  setEditedData({...editedData, notInClassroom: newVal})
+                                }}
+                                min="0"
+                                style={{ height: '32px' }}
+                              />
+                            </div>
+                            
+                            {editedData.notInClassroom >= 1 && (
+                              <div>
+                                <div className="form-group">
+                                  <label style={{ fontSize: '16px' }}>未在教室原因</label>
+                                  <input
+                                    type="text"
+                                    value={notInClassroomReason}
+                                    onChange={(e) => setNotInClassroomReason(e.target.value)}
+                                    placeholder="请输入具体原因"
+                                    style={{ height: '32px', fontSize: '16px' }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="form-actions" style={{ marginTop: '16px', display: 'flex', gap: '10px' }}>
+                              <button className="secondary-btn" style={{ fontSize: '16px', height: '32px' }} onClick={cancelEditing}>取消</button>
+                              <button className="submit-btn" style={{ fontSize: '16px', height: '32px' }} onClick={() => saveEditing(record)}>保存</button>
+                            </div>
                           </div>
-                          <div className="detail-item">
-                            <span className="label">实到：</span>
-                            <span className="value">{record.present}</span>
+                        ) : (
+                          // 显示模式
+                          <div>
+                            <div className="record-header">
+                              <span className="class-name" style={{ fontSize: '16px' }}>{record.className}</span>
+                              <span className="instructor" style={{ fontSize: '16px' }}>辅导员：{record.instructor}</span>
+                            </div>
+                            <div className="record-details">
+                              <div className="detail-item">
+                                <span className="label" style={{ fontSize: '16px' }}>应到：</span>
+                                <span className="value" style={{ fontSize: '16px' }}>{classInfo?.count || (parseInt(record.present) || 0) + leave}</span>
+                              </div>
+                              <div className="detail-item">
+                                <span className="label" style={{ fontSize: '16px' }}>实到：</span>
+                                <span className="value" style={{ fontSize: '16px' }}>{record.present}</span>
+                              </div>
+                              <div className="detail-item">
+                                <span className="label" style={{ fontSize: '16px' }}>请假：</span>
+                                <span className="value" style={{ fontSize: '16px' }}>{leave || '-'}</span>
+                              </div>
+                              <div className="detail-item">
+                                <span className="label" style={{ fontSize: '16px' }}>迟到：</span>
+                                <span className="value" style={{ fontSize: '16px' }}>{late || '-'}</span>
+                              </div>
+                              <div className="detail-item">
+                                <span className="label" style={{ fontSize: '16px' }}>旷课：</span>
+                                <span className="value" style={{ fontSize: '16px' }}>{absent || '-'}</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="detail-item">
-                            <span className="label">请假：</span>
-                            <span className="value">{leave || '-'}</span>
-                          </div>
-                          <div className="detail-item">
-                            <span className="label">迟到：</span>
-                            <span className="value">{late || '-'}</span>
-                          </div>
-                          <div className="detail-item">
-                            <span className="label">旷课：</span>
-                            <span className="value">{absent || '-'}</span>
-                          </div>
-                        </div>
+                        )}
                       </div>
-                    );
-                  });
+                    )
+                  })
                 })()}
               </div>
             </div>
 
             <div className="section">
-              <h4>违纪与扣分登记</h4>
+              <h4 style={{ fontSize: '16px' }}>违纪与扣分登记</h4>
               <div className="violations-list">
                 {violations.length === 0 && (
-                  <div style={{ color: '#999', padding: '20px 0' }}>暂无违纪记录</div>
+                  <div style={{ color: '#999', padding: '20px 0', fontSize: '16px' }}>暂无违纪记录</div>
                 )}
                 {violations.map((violation, index) => (
                   <div key={index} className="violation-item">
@@ -437,10 +956,12 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                       placeholder="学生姓名"
                       value={violation.name}
                       onChange={(e) => updateViolation(index, 'name', e.target.value)}
+                      style={{ height: '32px', fontSize: '16px' }}
                     />
                     <select
                       value={violation.type}
                       onChange={(e) => updateViolation(index, 'type', e.target.value)}
+                      style={{ height: '32px', fontSize: '16px' }}
                     >
                       <option value="sleep">睡觉</option>
                       <option value="food">带餐</option>
@@ -454,26 +975,27 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                       type="file" 
                       accept="image/*" 
                       onChange={(e) => handleFileChange(index, e)} 
+                      style={{ height: '32px', fontSize: '16px' }}
                     />
-                    {!violation.hasPhoto && <span style={{ color: '#e74c3c', fontSize: 'var(--font-size-base)' }}>（需上传照片）</span>}
-                    <button className="remove-btn" onClick={() => removeViolation(index)}>删除</button>
+                    {!violation.hasPhoto && <span style={{ color: '#e74c3c', fontSize: '16px' }}>（需上传照片）</span>}
+                    <button className="remove-btn" style={{ fontSize: '16px', height: '32px' }} onClick={() => removeViolation(index)}>删除</button>
                   </div>
                 ))}
-                <button className="add-violation-btn" onClick={addViolation}>+ 添加违纪记录</button>
+                <button className="add-violation-btn" style={{ fontSize: '16px', height: '32px' }} onClick={addViolation}>+ 添加违纪记录</button>
               </div>
             </div>
 
             <div className="section">
-              <h4>学风分数</h4>
+              <h4 style={{ fontSize: '16px' }}>学风分数</h4>
               <div className="score-display">
-                <span className="score-label">班级学风分数：</span>
-                <span className="score-value" style={{ color: '#333' }}>{calculateScore()}</span>
-                <span className="score-unit">分</span>
+                <span className="score-label" style={{ fontSize: '16px' }}>班级学风分数：</span>
+                <span className="score-value" style={{ color: '#333', fontSize: '16px' }}>{calculateScore()}</span>
+                <span className="score-unit" style={{ fontSize: '16px' }}>分</span>
               </div>
             </div>
 
             <div className="form-actions">
-              <button className="submit-btn" onClick={handleSubmit}>提交督查</button>
+              <button className="submit-btn" style={{ fontSize: '16px', height: '38px' }} onClick={handleSubmit}>提交督查</button>
             </div>
           </div>
         )}
@@ -500,7 +1022,14 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                         <span>{currentTimeSlot === '上午' ? '1、2' : '5、6'}</span>
                         <span>节</span>
                         <span style={{ marginLeft: '20px' }}>检查人：</span>
-                        <span>{inspector || '未填写'}</span>
+                        <span>{(() => {
+                          const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords)
+                          if (uniqueRecords.length > 0) {
+                            const inspectors = Array.from(new Set(uniqueRecords.map(r => r.inspector))).filter(Boolean)
+                            return inspectors.join('、') || '未填写'
+                          }
+                          return inspector || '未填写'
+                        })()}</span>
                       </div>
                     </th>
                   </tr>
@@ -521,7 +1050,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                 </thead>
                 <tbody>
                   {(() => {
-                    const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords);
+                    const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords)
                     if (uniqueRecords.length === 0) {
                       return (
                         <tr>
@@ -529,10 +1058,9 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                             暂无督查记录
                           </td>
                         </tr>
-                      );
+                      )
                     }
                     return uniqueRecords.map((record) => {
-                      // 筛选违纪情况，排除迟到
                       const filteredViolations = record.violations.filter(v => v.type !== 'late')
                       
                       return (
@@ -546,13 +1074,11 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                           <td>{record.classAttendance && record.classAttendance.late > 0 ? record.classAttendance.late : '-'}</td>
                           <td>
                             {filteredViolations.length === 0 ? '无' : (() => {
-                              // 按违纪类型统计人数
                               const typeCount: { [key: string]: number } = {}
                               filteredViolations.forEach(v => {
                                 const type = violationTypeMap[v.type] || v.type
                                 typeCount[type] = (typeCount[type] || 0) + 1
                               })
-                              // 转换为显示格式
                               return Object.entries(typeCount)
                                 .map(([type, count]) => `${type}：${count}`)
                                 .join('，')
@@ -561,7 +1087,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                           <td>{record.score}分</td>
                         </tr>
                       )
-                    });
+                    })
                   })()}
                 </tbody>
               </table>
@@ -569,7 +1095,20 @@ function Secretary({ user, onLogout }: SecretaryProps) {
             <div className="form-actions">
               <button 
                 className="secondary-btn" 
-                onClick={handleExportExcel}
+                onClick={() => {
+                  const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords)
+                  let exportInspector = inspector
+                  if (uniqueRecords.length > 0) {
+                    const inspectors = Array.from(new Set(uniqueRecords.map(r => r.inspector))).filter(Boolean)
+                    exportInspector = inspectors.join('、')
+                  }
+                  const filename = `督查记录表_${currentDate}_${currentTimeSlot}.xlsx`
+                  exportSupervisionRecordsToExcel(uniqueRecords, filename, {
+                    date: currentDate,
+                    timeSlot: currentDisplayTimeSlot,
+                    inspector: exportInspector
+                  })
+                }}
               >
                 导出 Excel
               </button>

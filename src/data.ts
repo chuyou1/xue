@@ -120,6 +120,31 @@ export const classroomsByFloor = {
   '2F': ['202', '204', '207a', '207b', '208', '209', '210a', '210b'],
 }
 
+// 学生姓名信息接口
+export interface StudentNameInfo {
+  name: string
+}
+
+// 请假学生信息接口
+export interface LeaveStudentInfo {
+  name: string
+  hasPhoto: boolean
+  specialNote?: string
+}
+
+// 提交阶段类型
+export type SubmissionStage = 'initial' | 'late' | 'absent' | 'update'
+
+// 通知接口
+export interface Notification {
+  id: string
+  type: 'attendance_update' | 'late_update' | 'absent_update'
+  className: string
+  message: string
+  timestamp: string
+  isRead: boolean
+}
+
 // 全局考勤记录接口
 export interface AttendanceRecord {
   id: string
@@ -134,6 +159,10 @@ export interface AttendanceRecord {
   absent: string
   submittedAt: string
   source: 'classMonitor' | 'secretary'
+  stage: SubmissionStage
+  leaveStudents?: LeaveStudentInfo[]
+  lateStudents?: StudentNameInfo[]
+  absentStudents?: StudentNameInfo[]
 }
 
 // 督查表记录接口
@@ -176,18 +205,28 @@ const loadFromStorage = () => {
   }
 }
 
+// 通知列表
+let notifications: Notification[] = []
+
+// 初始化时加载数据
+loadFromStorage()
+try {
+  const savedNotifications = localStorage.getItem('notifications')
+  if (savedNotifications) notifications = JSON.parse(savedNotifications)
+} catch (e) {
+  console.error('Failed to load notifications from localStorage:', e)
+}
+
 // 保存到 localStorage
 const saveToStorage = () => {
   try {
     localStorage.setItem('attendanceRecords', JSON.stringify(attendanceRecords))
     localStorage.setItem('supervisionRecords', JSON.stringify(supervisionRecords))
+    localStorage.setItem('notifications', JSON.stringify(notifications))
   } catch (e) {
     console.error('Failed to save data to localStorage:', e)
   }
 }
-
-// 初始化时加载数据
-loadFromStorage()
 
 // 保存考勤记录
 export const saveAttendanceRecord = (record: AttendanceRecord) => {
@@ -211,6 +250,42 @@ export const getAttendanceByClassroom = (classroom: string, date?: string, timeS
     if (timeSlot) match = match && r.timeSlot === timeSlot
     return match
   })
+}
+
+// 获取某班级今天的考勤记录
+export const getTodayAttendanceByClass = (className: string) => {
+  const today = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
+  return attendanceRecords.filter(r => r.className === className && r.date === today)
+}
+
+// 添加通知
+export const addNotification = (notification: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => {
+  const newNotification: Notification = {
+    ...notification,
+    id: Date.now().toString(),
+    timestamp: new Date().toISOString(),
+    isRead: false
+  }
+  notifications.unshift(newNotification)
+  saveToStorage()
+  return newNotification
+}
+
+// 获取通知
+export const getNotifications = () => [...notifications]
+
+// 标记通知为已读
+export const markNotificationAsRead = (id: string) => {
+  const notification = notifications.find(n => n.id === id)
+  if (notification) {
+    notification.isRead = true
+    saveToStorage()
+  }
+}
+
+// 获取未读通知数量
+export const getUnreadNotificationCount = () => {
+  return notifications.filter(n => !n.isRead).length
 }
 
 // 保存督查记录 - 暂时不保存照片到localStorage（文件太大）
@@ -256,6 +331,170 @@ export const getUniqueAttendanceRecords = (records: AttendanceRecord[]) => {
     }
   })
   return Array.from(map.values())
+}
+
+// 异常记录类型
+export type AnomalyType = 'not_in_classroom' | 'leave_change' | 'late_change' | 'absent_change' | 'present_change'
+
+// 异常学生信息
+export interface AnomalyStudent {
+  name: string
+  photo?: File
+  hasPhoto: boolean
+}
+
+// 异常记录接口
+export interface AnomalyRecord {
+  id: string
+  date: string
+  timeSlot: string
+  classroom: string
+  className: string
+  instructor: string
+  inspector: string
+  type: AnomalyType
+  // 原始数据
+  originalData: {
+    present: number
+    leave: number
+    late: number
+    absent: number
+  }
+  // 编辑后数据
+  editedData: {
+    present: number
+    leave: number
+    late: number
+    absent: number
+    notInClassroom: number
+  }
+  // 各类异常学生
+  leaveStudents: AnomalyStudent[]
+  lateStudents: AnomalyStudent[]
+  absentStudents: AnomalyStudent[]
+  notInClassroomStudents: AnomalyStudent[]
+  // 未在教室原因
+  notInClassroomReason: string
+  // 原因详情
+  reason: string
+  createdAt: string
+  hasAnomaly: boolean
+}
+
+// 异常记录存储
+let anomalyRecords: AnomalyRecord[] = []
+
+// 异常统计记录（按日期）
+interface AnomalyDayStats {
+  date: string
+  count: number
+  lastResetTime: string
+}
+
+let anomalyDayStats: AnomalyDayStats[] = []
+
+// 从 localStorage 加载异常数据
+const loadAnomaliesFromStorage = () => {
+  try {
+    const savedAnomalies = localStorage.getItem('anomalyRecords')
+    const savedStats = localStorage.getItem('anomalyDayStats')
+    if (savedAnomalies) anomalyRecords = JSON.parse(savedAnomalies)
+    if (savedStats) anomalyDayStats = JSON.parse(savedStats)
+  } catch (e) {
+    console.error('Failed to load anomaly data from localStorage:', e)
+  }
+}
+
+// 初始化加载异常数据
+loadAnomaliesFromStorage()
+
+// 保存异常数据到 localStorage
+const saveAnomaliesToStorage = () => {
+  try {
+    localStorage.setItem('anomalyRecords', JSON.stringify(anomalyRecords))
+    localStorage.setItem('anomalyDayStats', JSON.stringify(anomalyDayStats))
+  } catch (e) {
+    console.error('Failed to save anomaly data to localStorage:', e)
+  }
+}
+
+// 检查并重置每日统计（12:00和24:00重置）
+const checkAndResetDailyStats = (currentDate: string) => {
+  const now = new Date()
+  const currentHour = now.getHours()
+  
+  // 查找当天的统计记录
+  let dayStat = anomalyDayStats.find(stat => stat.date === currentDate)
+  
+  if (dayStat) {
+    const lastReset = new Date(dayStat.lastResetTime)
+    const lastResetHour = lastReset.getHours()
+    
+    // 如果是12点后且上次重置在12点前，或24点后，重置计数
+    if ((currentHour >= 12 && lastResetHour < 12) || currentHour === 0) {
+      dayStat.count = 0
+      dayStat.lastResetTime = now.toISOString()
+      saveAnomaliesToStorage()
+    }
+  } else {
+    // 没有当天记录，创建新记录
+    dayStat = {
+      date: currentDate,
+      count: 0,
+      lastResetTime: now.toISOString()
+    }
+    anomalyDayStats.push(dayStat)
+    saveAnomaliesToStorage()
+  }
+  
+  return dayStat
+}
+
+// 保存异常记录
+export const saveAnomalyRecord = (record: AnomalyRecord) => {
+  const existingIndex = anomalyRecords.findIndex(r => r.id === record.id)
+  const recordToSave = { ...record }
+  
+  // 移除照片数据
+  const cleanStudent = (s: AnomalyStudent) => {
+    const sCopy = { ...s }
+    delete sCopy.photo
+    return sCopy
+  }
+  recordToSave.leaveStudents = recordToSave.leaveStudents.map(cleanStudent)
+  recordToSave.lateStudents = recordToSave.lateStudents.map(cleanStudent)
+  recordToSave.absentStudents = recordToSave.absentStudents.map(cleanStudent)
+  recordToSave.notInClassroomStudents = recordToSave.notInClassroomStudents.map(cleanStudent)
+  
+  if (existingIndex >= 0) {
+    anomalyRecords[existingIndex] = recordToSave
+  } else {
+    anomalyRecords.unshift(recordToSave)
+  }
+  
+  // 如果是新的异常记录，增加当日统计
+  if (existingIndex < 0 && record.hasAnomaly) {
+    const dayStat = checkAndResetDailyStats(record.date)
+    dayStat.count++
+  }
+  
+  saveAnomaliesToStorage()
+}
+
+// 获取所有异常记录
+export const getAnomalyRecords = () => [...anomalyRecords]
+
+// 获取指定日期的异常记录
+export const getAnomalyRecordsByDate = (date: string) => {
+  return anomalyRecords.filter(r => r.date === date)
+}
+
+// 获取当日异常数
+export const getTodayAnomalyCount = () => {
+  const today = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
+  checkAndResetDailyStats(today)
+  const dayStat = anomalyDayStats.find(stat => stat.date === today)
+  return dayStat?.count || 0
 }
 
 // 对督查记录去重，每个班级只保留最新的一条记录
