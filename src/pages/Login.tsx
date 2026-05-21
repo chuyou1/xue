@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import '../styles/Login.css'
 import { User } from '../data'
-import { mockApi } from '../services/mockApi'
+import { api } from '../services/api'
 
 interface LoginProps {
   onLogin: (user: User) => void
@@ -27,7 +27,7 @@ function Login({ onLogin }: LoginProps) {
     }
 
     try {
-      const user = await mockApi.auth.login(username, password)
+      const user = await api.auth.login(username, password)
       onLogin(user)
       
       switch (user.role) {

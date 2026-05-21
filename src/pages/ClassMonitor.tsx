@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import '../styles/ClassMonitor.css'
 import { User, getClassInfo, ClassInfo, AttendanceRecord as GlobalAttendanceRecord, LeaveStudentInfo, StudentNameInfo, SubmissionStage } from '../data'
-import { mockApi } from '../services/mockApi'
+import { api } from '../services/api'
 
 interface ClassMonitorProps {
   user: User
@@ -89,7 +89,7 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
   useEffect(() => {
     const loadTodayRecord = async () => {
       if (user.className) {
-        const todayRecords = await mockApi.attendance.getByClass(user.className)
+        const todayRecords = await api.attendance.getByClass(user.className)
         const initialRecord = todayRecords.find(r => r.stage === 'initial')
         if (initialRecord) {
           setTodayRecordId(initialRecord.id)
@@ -131,6 +131,11 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
   }
 
+  // 防止滚轮触发输入
+  const preventWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+  }
+
   // 自动关闭验证错误弹窗
   useEffect(() => {
     if (validationError) {
@@ -161,7 +166,7 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
   useEffect(() => {
     const loadAttendanceRecords = async () => {
       if (user.className) {
-        const allRecords = await mockApi.attendance.getAll()
+        const allRecords = await api.attendance.getAll()
         const classRecords = allRecords
           .filter(r => r.className === user.className && r.source === 'classMonitor')
           .map(r => ({
@@ -453,7 +458,7 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     }
     
     try {
-      const savedRecord = await mockApi.attendance.create(newRecord)
+      const savedRecord = await api.attendance.create(newRecord)
       
       const hasException = (lateCount > 0 || absentCount > 0)
       if (hasException) {
@@ -468,7 +473,7 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
           lateCount > 0 && absentCount > 0 ? 'attendance_update' : (lateCount > 0 ? 'late_update' : 'absent_update')
         const message = `${user.className} 提交考勤：${parts.join('，')}`
         
-        await mockApi.notifications.create({
+        await api.notifications.create({
           type: notificationType,
           className: user.className || '未知班级',
           message
@@ -532,19 +537,21 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
         </div>
       </header>
 
-      <div className="tabs">
-        <button
-          className={`tab ${activeTab === 'attendance' ? 'active' : ''}`}
-          onClick={() => setActiveTab('attendance')}
-        >
-          本班考勤录入
-        </button>
-        <button
-          className={`tab ${activeTab === 'history' ? 'active' : ''}`}
-          onClick={() => setActiveTab('history')}
-        >
-          历史考勤记录
-        </button>
+      <div className="tabs-container">
+        <div className="tabs">
+          <button
+            className={`tab ${activeTab === 'attendance' ? 'active' : ''}`}
+            onClick={() => setActiveTab('attendance')}
+          >
+            本班考勤录入
+          </button>
+          <button
+            className={`tab ${activeTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('history')}
+          >
+            历史考勤记录
+          </button>
+        </div>
       </div>
 
       <main className="main-content">
@@ -629,18 +636,26 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
                 <div className="form-group">
                   <label>实到人数</label>
                   <input
-                    type="number"
+                    type="text"
                     value={present}
-                    onChange={(e) => setPresent(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^\d]/g, '')
+                      setPresent(val)
+                    }}
+                    onWheel={preventWheel}
                     placeholder="实到人数"
                   />
                 </div>
                 <div className="form-group">
                   <label>请假人数</label>
                   <input
-                    type="number"
+                    type="text"
                     value={leave}
-                    onChange={(e) => setLeave(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^\d]/g, '')
+                      setLeave(val)
+                    }}
+                    onWheel={preventWheel}
                     placeholder="请假人数"
                   />
                 </div>
@@ -649,18 +664,26 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
                 <div className="form-group">
                   <label>迟到人数</label>
                   <input
-                    type="number"
+                    type="text"
                     value={late}
-                    onChange={(e) => setLate(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^\d]/g, '')
+                      setLate(val)
+                    }}
+                    onWheel={preventWheel}
                     placeholder="迟到人数"
                   />
                 </div>
                 <div className="form-group">
                   <label>旷课人数</label>
                   <input
-                    type="number"
+                    type="text"
                     value={absent}
-                    onChange={(e) => setAbsent(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^\d]/g, '')
+                      setAbsent(val)
+                    }}
+                    onWheel={preventWheel}
                     placeholder="旷课人数"
                   />
                 </div>

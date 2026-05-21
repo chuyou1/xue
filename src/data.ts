@@ -112,7 +112,7 @@ export const getClassInfo = (className: string): ClassInfo | undefined => {
   return classes.find(c => c.name === className)
 }
 
-export const classroomsByFloor = {
+export let classroomsByFloor = {
   '9F': ['903', '904'],
   '6-8F': [],
   '5F': ['501', '502', '503', '504', '505', '506', '507'],
@@ -120,6 +120,67 @@ export const classroomsByFloor = {
   '3F': ['301', '302', '303', '304', '305', '307'],
   '2F': ['202', '204', '207a', '207b', '208', '209', '210a', '210b'],
 }
+
+// 新增教室
+export const addClassroom = (floorName: string, roomNumber: string) => {
+  if (!classroomsByFloor[floorName]) {
+    classroomsByFloor[floorName] = []
+  }
+  if (!classroomsByFloor[floorName].includes(roomNumber)) {
+    classroomsByFloor[floorName].push(roomNumber)
+    saveClassroomsToStorage()
+  }
+}
+
+// 从localStorage加载自定义教室
+const loadClassroomsFromStorage = () => {
+  try {
+    const savedClassrooms = localStorage.getItem('customClassrooms')
+    if (savedClassrooms) {
+      const customClassrooms = JSON.parse(savedClassrooms)
+      Object.keys(customClassrooms).forEach(floor => {
+        if (!classroomsByFloor[floor]) {
+          classroomsByFloor[floor] = []
+        }
+        customClassrooms[floor].forEach((room: string) => {
+          if (!classroomsByFloor[floor].includes(room)) {
+            classroomsByFloor[floor].push(room)
+          }
+        })
+      })
+    }
+  } catch (e) {
+    console.error('Failed to load custom classrooms from localStorage:', e)
+  }
+}
+
+// 保存自定义教室到localStorage
+const saveClassroomsToStorage = () => {
+  try {
+    const customClassrooms: Record<string, string[]> = {}
+    Object.keys(classroomsByFloor).forEach(floor => {
+      const standardRooms = {
+        '9F': ['903', '904'],
+        '6-8F': [],
+        '5F': ['501', '502', '503', '504', '505', '506', '507'],
+        '4F': ['401', '402', '403', '404', '405', '406'],
+        '3F': ['301', '302', '303', '304', '305', '307'],
+        '2F': ['202', '204', '207a', '207b', '208', '209', '210a', '210b'],
+      }[floor] || []
+      
+      const customRooms = classroomsByFloor[floor].filter(room => !standardRooms.includes(room))
+      if (customRooms.length > 0) {
+        customClassrooms[floor] = customRooms
+      }
+    })
+    localStorage.setItem('customClassrooms', JSON.stringify(customClassrooms))
+  } catch (e) {
+    console.error('Failed to save custom classrooms to localStorage:', e)
+  }
+}
+
+// 初始化时加载自定义教室
+loadClassroomsFromStorage()
 
 // 学生姓名信息接口
 export interface StudentNameInfo {
@@ -356,18 +417,18 @@ export interface AnomalyRecord {
   type: AnomalyType
   // 原始数据
   originalData: {
-    present: number
-    leave: number
-    late: number
-    absent: number
+    present: string
+    leave: string
+    late: string
+    absent: string
   }
   // 编辑后数据
   editedData: {
-    present: number
-    leave: number
-    late: number
-    absent: number
-    notInClassroom: number
+    present: string
+    leave: string
+    late: string
+    absent: string
+    notInClassroom: string
   }
   // 各类异常学生
   leaveStudents: AnomalyStudent[]

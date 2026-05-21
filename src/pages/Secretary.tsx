@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import '../styles/Secretary.css'
 import { 
   User, 
@@ -10,9 +10,10 @@ import {
   getUniqueSupervisionRecords, 
   Notification, 
   AnomalyRecord,
-  AnomalyStudent
+  AnomalyStudent,
+  addClassroom
 } from '../data'
-import { mockApi } from '../services/mockApi'
+import { api } from '../services/api'
 import { useModal } from '../contexts/ModalContext'
 import { exportSupervisionRecordsToExcel } from '../utils/exportExcel'
 
@@ -44,21 +45,29 @@ function Secretary({ user, onLogout }: SecretaryProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [notifications, setNotifications] = useState<Notification[]>([])
   
+  // 新增教室相关状态
+  const [showAddClassroomModal, setShowAddClassroomModal] = useState(false)
+  const [newClassroomNumber, setNewClassroomNumber] = useState('')
+  const [currentFloor, setCurrentFloor] = useState<string | null>(null)
+  
+  // 强制重新渲染教室列表
+  const [classroomsKey, setClassroomsKey] = useState(0)
+  
   // 编辑模式相关状态
   const [isEditing, setIsEditing] = useState(false)
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null)
   const [editedData, setEditedData] = useState({
-    present: 0,
-    leave: 0,
-    late: 0,
-    absent: 0,
-    notInClassroom: 0
+    present: '',
+    leave: '',
+    late: '',
+    absent: '',
+    notInClassroom: ''
   })
   const [originalData, setOriginalData] = useState({
-    present: 0,
-    leave: 0,
-    late: 0,
-    absent: 0
+    present: '',
+    leave: '',
+    late: '',
+    absent: ''
   })
   const [leaveStudents, setLeaveStudents] = useState<AnomalyStudent[]>([])
   const [lateStudents, setLateStudents] = useState<AnomalyStudent[]>([])
@@ -81,8 +90,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
     'dye': '染发',
     'no-book': '未带书',
     'phone': '玩手机',
-    'hygiene': '卫生差',
-    'absent': '旷课'
+    'hygiene': '卫生差'
   }
 
   const getDisplayTimeSlot = () => {
@@ -112,8 +120,8 @@ function Secretary({ user, onLogout }: SecretaryProps) {
       setCurrentDisplayTimeSlot(getDisplayTimeSlot())
       
       const [supervision, notifications] = await Promise.all([
-        mockApi.supervision.getAll(),
-        mockApi.notifications.getAll()
+        api.supervision.getAll(),
+        api.notifications.getAll()
       ])
       setSupervisionRecords(supervision)
       setNotifications(notifications)
@@ -133,7 +141,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
   useEffect(() => {
     const loadSupervisionRecords = async () => {
       if (activeTab === 'report') {
-        const records = await mockApi.supervision.getAll()
+        const records = await api.supervision.getAll()
         setSupervisionRecords(records)
       }
     }
@@ -144,7 +152,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
   useEffect(() => {
     const loadAttendanceRecords = async () => {
       if (selectedClassroom && currentDate && currentTimeSlot) {
-        const records = await mockApi.attendance.getByClassroom(selectedClassroom.number, currentDate, currentTimeSlot)
+        const records = await api.attendance.getByClassroom(selectedClassroom.number, currentDate, currentTimeSlot)
         setClassAttendanceRecords(records)
       }
     }
@@ -153,6 +161,51 @@ function Secretary({ user, onLogout }: SecretaryProps) {
 
   const toggleFloor = (floorName: string) => {
     setExpandedFloor(expandedFloor === floorName ? null : floorName)
+  }
+  
+  // 处理新增教室按钮点击
+  const handleAddClassroomClick = (floorName: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCurrentFloor(floorName)
+    setNewClassroomNumber('')
+    setShowAddClassroomModal(true)
+  }
+  
+  // 确认添加教室
+  const handleConfirmAddClassroom = () => {
+    if (!currentFloor || !newClassroomNumber.trim()) {
+      showModal({
+        title: '提示',
+        message: '请输入教室编号',
+        type: 'warning'
+      })
+      return
+    }
+    
+    const roomNumber = newClassroomNumber.trim()
+    
+    // 检查教室是否已存在
+    if (classroomsByFloor[currentFloor]?.includes(roomNumber)) {
+      showModal({
+        title: '提示',
+        message: '该教室已存在',
+        type: 'warning'
+      })
+      return
+    }
+    
+    // 添加教室
+    addClassroom(currentFloor, roomNumber)
+    setClassroomsKey(prev => prev + 1) // 强制重新渲染
+    setShowAddClassroomModal(false)
+    setNewClassroomNumber('')
+    setCurrentFloor(null)
+    
+    showModal({
+      title: '成功',
+      message: `教室 ${roomNumber} 已添加`,
+      type: 'success'
+    })
   }
 
   const selectClassroom = (classroom: Classroom) => {
@@ -216,17 +269,18 @@ function Secretary({ user, onLogout }: SecretaryProps) {
 
   // 关闭通知
   const handleCloseNotification = async (id: string) => {
-    await mockApi.notifications.markAsRead(id)
-    const updated = await mockApi.notifications.getAll()
+    await api.notifications.markAsRead(id)
+    const updated = await api.notifications.getAll()
     setNotifications(updated)
   }
 
   // 开始编辑模式
   const startEditing = (record: GlobalAttendanceRecord) => {
-    const leave = parseInt(record.leave) || 0
-    const late = parseInt(record.late) || 0
-    const absent = parseInt(record.absent) || 0
-    const present = parseInt(record.present) || 0
+    // 如果有有效值就保留，否则设为空字符串
+    const leave = record.leave && record.leave !== '0' ? record.leave : ''
+    const late = record.late && record.late !== '0' ? record.late : ''
+    const absent = record.absent && record.absent !== '0' ? record.absent : ''
+    const present = record.present && record.present !== '0' ? record.present : ''
     
     setOriginalData({
       present,
@@ -240,7 +294,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
       leave,
       late,
       absent,
-      notInClassroom: 0
+      notInClassroom: ''
     })
     
     setLeaveStudents([])
@@ -304,13 +358,18 @@ function Secretary({ user, onLogout }: SecretaryProps) {
     })
   }
 
+  // 防止滚轮触发输入
+  const preventWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+  }
+
   // 检查是否为异常编辑
   const checkIsAnomaly = () => {
     const presentChanged = editedData.present !== originalData.present
     const leaveChanged = editedData.leave !== originalData.leave
     const lateChanged = editedData.late !== originalData.late
     const absentChanged = editedData.absent !== originalData.absent
-    const notInClassroomHasCount = editedData.notInClassroom >= 1
+    const notInClassroomHasCount = editedData.notInClassroom !== '' && parseInt(editedData.notInClassroom) >= 1
     
     return presentChanged || leaveChanged || lateChanged || absentChanged || notInClassroomHasCount
   }
@@ -370,52 +429,76 @@ function Secretary({ user, onLogout }: SecretaryProps) {
       return true
     }
 
-    if (editedData.leave > 0 && !validateStudents(leaveStudents, '请假', true)) return
-    if (editedData.late > 0 && !validateStudents(lateStudents, '迟到', false)) return
-    if (editedData.absent > 0 && !validateStudents(absentStudents, '旷课', false)) return
+    if (editedData.leave !== '' && parseInt(editedData.leave) >= 1 && !validateStudents(leaveStudents, '请假', true)) return
+    if (editedData.late !== '' && parseInt(editedData.late) >= 1 && !validateStudents(lateStudents, '迟到', false)) return
+    if (editedData.absent !== '' && parseInt(editedData.absent) >= 1 && !validateStudents(absentStudents, '旷课', false)) return
 
     const hasAnomaly = checkIsAnomaly()
 
-    if (hasAnomaly) {
-      const anomalyRecord: Omit<AnomalyRecord, 'id'> = {
+    try {
+      // 1. 创建新的考勤记录
+      const newAttendanceRecord: Omit<GlobalAttendanceRecord, 'id'> = {
         date: currentDate,
         timeSlot: currentTimeSlot,
         classroom: selectedClassroom?.number || '',
         className: originalRecord.className,
         instructor: originalRecord.instructor,
-        inspector: inspector,
-        type: getAnomalyType(),
-        originalData,
-        editedData,
-        leaveStudents,
-        lateStudents,
-        absentStudents,
-        notInClassroomStudents,
-        notInClassroomReason,
-        reason: generateReason(),
-        createdAt: new Date().toISOString(),
-        hasAnomaly: true
+        present: editedData.present,
+        leave: editedData.leave,
+        late: editedData.late,
+        absent: editedData.absent,
+        submittedAt: new Date().toISOString(),
+        source: 'secretary',
+        stage: 'update',
+        leaveStudents: leaveStudents.map(s => ({ name: s.name, hasPhoto: s.hasPhoto, specialNote: s.specialNote })),
+        lateStudents: lateStudents.map(s => ({ name: s.name })),
+        absentStudents: absentStudents.map(s => ({ name: s.name })),
       }
       
-      try {
-        await mockApi.anomalies.create(anomalyRecord)
-        showModal({
-          title: '成功',
-          message: '考勤编辑已保存，已记录异常数据！',
-          type: 'success'
-        })
-      } catch (err) {
-        showModal({
-          title: '错误',
-          message: '保存失败，请重试',
-          type: 'warning'
-        })
+      // 2. 保存新的考勤记录
+      await api.attendance.create(newAttendanceRecord)
+      
+      // 3. 如果有异常数据，也保存异常记录
+      if (hasAnomaly) {
+        const anomalyRecord: Omit<AnomalyRecord, 'id'> = {
+          date: currentDate,
+          timeSlot: currentTimeSlot,
+          classroom: selectedClassroom?.number || '',
+          className: originalRecord.className,
+          instructor: originalRecord.instructor,
+          inspector: inspector,
+          type: getAnomalyType(),
+          originalData,
+          editedData,
+          leaveStudents,
+          lateStudents,
+          absentStudents,
+          notInClassroomStudents,
+          notInClassroomReason,
+          reason: generateReason(),
+          createdAt: new Date().toISOString(),
+          hasAnomaly: true
+        }
+        
+        await api.anomalies.create(anomalyRecord)
       }
-    } else {
+      
+      // 4. 重新加载考勤记录，更新页面显示
+      if (selectedClassroom) {
+        const records = await api.attendance.getByClassroom(selectedClassroom.number, currentDate, currentTimeSlot)
+        setClassAttendanceRecords(records)
+      }
+      
       showModal({
-        title: '提示',
-        message: '数据无变化，无需保存。',
-        type: 'info'
+        title: '成功',
+        message: '考勤编辑已保存！',
+        type: 'success'
+      })
+    } catch (err) {
+      showModal({
+        title: '错误',
+        message: '保存失败，请重试',
+        type: 'warning'
       })
     }
     
@@ -424,13 +507,23 @@ function Secretary({ user, onLogout }: SecretaryProps) {
 
   const calculateScore = () => {
     let score = 100
+    
+    // 违纪记录扣分（每个违纪扣0.5分）
     violations.forEach(v => {
-      if (v.type === 'absent') {
-      } else {
-        score -= 0.5
-      }
+      score -= 0.5
     })
-    return score
+    
+    // 考勤记录扣分（迟到每人扣0.5分，旷课每人扣1分）
+    const uniqueRecords = getUniqueAttendanceRecords(classAttendanceRecords)
+    uniqueRecords.forEach(record => {
+      const late = record.late && record.late !== '' ? parseInt(record.late) : 0
+      const absent = record.absent && record.absent !== '' ? parseInt(record.absent) : 0
+      score -= late * 0.5
+      score -= absent * 1
+    })
+    
+    // 确保分数不低于0
+    return Math.max(0, score)
   }
 
   const handleSubmit = () => {
@@ -480,12 +573,17 @@ function Secretary({ user, onLogout }: SecretaryProps) {
     const doSubmit = async () => {
       let classAttendanceInfo
       if (classRecord) {
+        const present = classRecord.present && classRecord.present !== '' ? parseInt(classRecord.present) : 0
+        const leave = classRecord.leave && classRecord.leave !== '' ? parseInt(classRecord.leave) : 0
+        const late = classRecord.late && classRecord.late !== '' ? parseInt(classRecord.late) : 0
+        const absent = classRecord.absent && classRecord.absent !== '' ? parseInt(classRecord.absent) : 0
+        
         classAttendanceInfo = {
-          shouldAttend: (parseInt(classRecord.present) || 0) + (parseInt(classRecord.leave) || 0),
-          present: parseInt(classRecord.present) || 0,
-          leave: parseInt(classRecord.leave) || 0,
-          late: parseInt(classRecord.late) || 0,
-          absent: parseInt(classRecord.absent) || 0
+          shouldAttend: present + leave,
+          present,
+          leave,
+          late,
+          absent
         }
       }
 
@@ -505,7 +603,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
       }
 
       try {
-        await mockApi.supervision.create(newRecord)
+        await api.supervision.create(newRecord)
         
         showModal({
           title: '成功',
@@ -515,7 +613,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
         
         setViolations([])
         setLeaveVerified(false)
-        const updated = await mockApi.supervision.getAll()
+        const updated = await api.supervision.getAll()
         setSupervisionRecords(updated)
       } catch (err) {
         showModal({
@@ -579,7 +677,8 @@ function Secretary({ user, onLogout }: SecretaryProps) {
         </div>
       )}
 
-      <div className="tabs">
+      <div className="tabs-container">
+        <div className="tabs">
         <button
           className={`tab ${activeTab === 'classrooms' ? 'active' : ''}`}
           onClick={() => { setActiveTab('classrooms'); setSelectedClassroom(null) }}
@@ -600,6 +699,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
         >
           督查表生成
         </button>
+        </div>
       </div>
 
       <main className="main-content">
@@ -620,7 +720,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
 
             <div className="floors-list">
               {Object.entries(classroomsByFloor).map(([floorName, rooms]) => (
-                <div key={floorName} className="floor-item">
+                <div key={`${floorName}-${classroomsKey}`} className="floor-item">
                   <div
                     className={`floor-header ${expandedFloor === floorName ? 'expanded' : ''}`}
                     onClick={() => toggleFloor(floorName)}
@@ -633,7 +733,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                         const checked = supervisionRecords.some(r => r.classroom === room && r.date === currentDate && r.timeSlot === currentTimeSlot)
                         return (
                           <div
-                            key={room}
+                            key={`${room}-${classroomsKey}`}
                             className="classroom-item"
                             onClick={() => selectClassroom({ id: room, floor: floorName, number: room, status: checked ? 'submitted' : 'pending' })}
                             style={{
@@ -652,9 +752,15 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                         )
                       })}
                       {(floorName === '9F' || floorName === '6-8F') && (
-                        <button className="add-classroom-btn" style={{ fontSize: '16px', height: '32px' }}>+ 新增教室</button>
+                        <button 
+                          className="add-classroom-btn" 
+                          style={{ fontSize: '24px', height: 'auto' }}
+                          onClick={(e) => handleAddClassroomClick(floorName, e)}
+                        >
+                          +
+                        </button>
                       )}
-                      {rooms.length === 0 && (
+                      {rooms.length === 0 && floorName !== '6-8F' && (
                         <div className="empty-state" style={{ fontSize: '16px' }}>该教室可添加</div>
                       )}
                     </div>
@@ -663,12 +769,17 @@ function Secretary({ user, onLogout }: SecretaryProps) {
               ))}
             </div>
             
-            <div className="leave-verified-section-bottom">
-              <label className="checkbox-label" style={{ fontSize: '16px' }}>
+            <div 
+              className="leave-verified-section-bottom"
+              onClick={() => setLeaveVerified(!leaveVerified)}
+              style={{ cursor: 'pointer' }}
+            >
+              <label className="checkbox-label" style={{ fontSize: '16px', pointerEvents: 'none' }}>
                 <input
                   type="checkbox"
                   checked={leaveVerified}
                   onChange={(e) => setLeaveVerified(e.target.checked)}
+                  style={{ pointerEvents: 'auto' }}
                 />
                 请假条均已核实
               </label>
@@ -740,10 +851,13 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                             <div className="form-group" style={{ marginTop: '16px' }}>
                               <label style={{ fontSize: '16px' }}>实到人数</label>
                               <input
-                                type="number"
+                                type="text"
                                 value={editedData.present}
-                                onChange={(e) => setEditedData({...editedData, present: parseInt(e.target.value) || 0})}
-                                min="0"
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^\d]/g, '')
+                                  setEditedData({...editedData, present: val})
+                                }}
+                                onWheel={preventWheel}
                                 style={{ height: '32px' }}
                               />
                             </div>
@@ -751,16 +865,16 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                             <div className="form-group">
                               <label style={{ fontSize: '16px' }}>请假人数</label>
                               <input
-                                type="number"
+                                type="text"
                                 value={editedData.leave}
                                 onChange={(e) => {
-                                  const newVal = parseInt(e.target.value) || 0
-                                  setEditedData({...editedData, leave: newVal})
+                                  const val = e.target.value.replace(/[^\d]/g, '')
+                                  setEditedData({...editedData, leave: val})
                                 }}
-                                min="0"
+                                onWheel={preventWheel}
                                 style={{ height: '32px' }}
                               />
-                              {editedData.leave >= 1 && (
+                              {editedData.leave !== '' && parseInt(editedData.leave) >= 1 && (
                                 <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
                                   <h5 style={{ marginBottom: '8px', fontSize: '16px' }}>请假学生信息</h5>
                                   {leaveStudents.map((student, index) => (
@@ -800,16 +914,16 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                             <div className="form-group">
                               <label style={{ fontSize: '16px' }}>迟到人数</label>
                               <input
-                                type="number"
+                                type="text"
                                 value={editedData.late}
                                 onChange={(e) => {
-                                  const newVal = parseInt(e.target.value) || 0
-                                  setEditedData({...editedData, late: newVal})
+                                  const val = e.target.value.replace(/[^\d]/g, '')
+                                  setEditedData({...editedData, late: val})
                                 }}
-                                min="0"
+                                onWheel={preventWheel}
                                 style={{ height: '32px', fontSize: '16px' }}
                               />
-                              {editedData.late >= 1 && (
+                              {editedData.late !== '' && parseInt(editedData.late) >= 1 && (
                                 <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
                                   <h5 style={{ marginBottom: '8px', fontSize: '16px' }}>迟到学生信息</h5>
                                   {lateStudents.map((student, index) => (
@@ -844,16 +958,16 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                             <div className="form-group">
                               <label style={{ fontSize: '16px' }}>旷课人数</label>
                               <input
-                                type="number"
+                                type="text"
                                 value={editedData.absent}
                                 onChange={(e) => {
-                                  const newVal = parseInt(e.target.value) || 0
-                                  setEditedData({...editedData, absent: newVal})
+                                  const val = e.target.value.replace(/[^\d]/g, '')
+                                  setEditedData({...editedData, absent: val})
                                 }}
-                                min="0"
+                                onWheel={preventWheel}
                                 style={{ height: '32px', fontSize: '16px' }}
                               />
-                              {editedData.absent >= 1 && (
+                              {editedData.absent !== '' && parseInt(editedData.absent) >= 1 && (
                                 <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
                                   <h5 style={{ marginBottom: '8px', fontSize: '16px' }}>旷课学生信息</h5>
                                   {absentStudents.map((student, index) => (
@@ -888,18 +1002,18 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                             <div className="form-group">
                               <label style={{ fontSize: '16px' }}>未在教室人数</label>
                               <input
-                                type="number"
+                                type="text"
                                 value={editedData.notInClassroom}
                                 onChange={(e) => {
-                                  const newVal = parseInt(e.target.value) || 0
-                                  setEditedData({...editedData, notInClassroom: newVal})
+                                  const val = e.target.value.replace(/[^\d]/g, '')
+                                  setEditedData({...editedData, notInClassroom: val})
                                 }}
-                                min="0"
+                                onWheel={preventWheel}
                                 style={{ height: '32px' }}
                               />
                             </div>
                             
-                            {editedData.notInClassroom >= 1 && (
+                            {editedData.notInClassroom !== '' && parseInt(editedData.notInClassroom) >= 1 && (
                               <div>
                                 <div className="form-group">
                                   <label style={{ fontSize: '16px' }}>未在教室原因</label>
@@ -929,23 +1043,23 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                             <div className="record-details">
                               <div className="detail-item">
                                 <span className="label" style={{ fontSize: '16px' }}>应到：</span>
-                                <span className="value" style={{ fontSize: '16px' }}>{classInfo?.count || (parseInt(record.present) || 0) + leave}</span>
+                                <span className="value" style={{ fontSize: '16px' }}>{classInfo?.count || (record.present && record.present !== '' ? parseInt(record.present) : 0) + (record.leave && record.leave !== '' ? parseInt(record.leave) : 0)}</span>
                               </div>
                               <div className="detail-item">
                                 <span className="label" style={{ fontSize: '16px' }}>实到：</span>
-                                <span className="value" style={{ fontSize: '16px' }}>{record.present}</span>
+                                <span className="value" style={{ fontSize: '16px' }}>{record.present || '-'}</span>
                               </div>
                               <div className="detail-item">
                                 <span className="label" style={{ fontSize: '16px' }}>请假：</span>
-                                <span className="value" style={{ fontSize: '16px' }}>{leave || '-'}</span>
+                                <span className="value" style={{ fontSize: '16px' }}>{record.leave || '-'}</span>
                               </div>
                               <div className="detail-item">
                                 <span className="label" style={{ fontSize: '16px' }}>迟到：</span>
-                                <span className="value" style={{ fontSize: '16px' }}>{late || '-'}</span>
+                                <span className="value" style={{ fontSize: '16px' }}>{record.late || '-'}</span>
                               </div>
                               <div className="detail-item">
                                 <span className="label" style={{ fontSize: '16px' }}>旷课：</span>
-                                <span className="value" style={{ fontSize: '16px' }}>{absent || '-'}</span>
+                                <span className="value" style={{ fontSize: '16px' }}>{record.absent || '-'}</span>
                               </div>
                             </div>
                           </div>
@@ -970,12 +1084,10 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                       placeholder="学生姓名"
                       value={violation.name}
                       onChange={(e) => updateViolation(index, 'name', e.target.value)}
-                      style={{ height: '32px', fontSize: '16px' }}
                     />
                     <select
                       value={violation.type}
                       onChange={(e) => updateViolation(index, 'type', e.target.value)}
-                      style={{ height: '32px', fontSize: '16px' }}
                     >
                       <option value="sleep">睡觉</option>
                       <option value="food">带餐</option>
@@ -983,19 +1095,25 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                       <option value="no-book">未带书</option>
                       <option value="phone">玩手机</option>
                       <option value="hygiene">卫生差</option>
-                      <option value="absent">旷课</option>
                     </select>
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={(e) => handleFileChange(index, e)} 
-                      style={{ height: '32px', fontSize: '16px' }}
-                    />
-                    {!violation.hasPhoto && <span style={{ color: '#e74c3c', fontSize: '16px' }}>（需上传照片）</span>}
-                    <button className="remove-btn" style={{ fontSize: '16px', height: '32px' }} onClick={() => removeViolation(index)}>删除</button>
+                    <label className="file-upload-label">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => handleFileChange(index, e)} 
+                        className="file-upload-input"
+                      />
+                      {violation.hasPhoto ? (
+                        <span className="file-upload-text file-uploaded">已上传</span>
+                      ) : (
+                        <span className="file-upload-text">上传照片</span>
+                      )}
+                    </label>
+                    {!violation.hasPhoto && <span>（需上传照片）</span>}
+                    <button className="remove-btn" onClick={() => removeViolation(index)}>删除</button>
                   </div>
                 ))}
-                <button className="add-violation-btn" style={{ fontSize: '16px', height: '32px' }} onClick={addViolation}>+ 添加违纪记录</button>
+                <button className="add-violation-btn" style={{ fontSize: '14px', height: '40px' }} onClick={addViolation}>+ 添加违纪记录</button>
               </div>
             </div>
 
@@ -1130,6 +1248,87 @@ function Secretary({ user, onLogout }: SecretaryProps) {
           </div>
         )}
       </main>
+      
+      {/* 新增教室弹窗 */}
+      {showAddClassroomModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '24px',
+            width: '90%',
+            maxWidth: '400px'
+          }}>
+            <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>新增教室</h3>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px' }}>
+                当前楼层：{currentFloor}
+              </label>
+              <input
+                type="text"
+                value={newClassroomNumber}
+                onChange={(e) => setNewClassroomNumber(e.target.value)}
+                placeholder="请输入教室编号（如：601）"
+                style={{
+                  width: '100%',
+                  height: '40px',
+                  padding: '0 12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  boxSizing: 'border-box'
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleConfirmAddClassroom()
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowAddClassroomModal(false)}
+                style={{
+                  padding: '10px 20px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmAddClassroom}
+                style={{
+                  padding: '10px 20px',
+                  border: 'none',
+                  borderRadius: '4px',
+                  backgroundColor: '#36B37E',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -179,52 +179,88 @@
   position: relative;
   display: inline-block;
   z-index: 1000;
+  vertical-align: top;
 }
 
 .tab-dropdown-container .tab {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 0;
+  width: auto;
+  min-width: auto;
+  padding: 10px 24px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  line-height: normal;
+  font-size: var(--font-size-base);
+  box-sizing: border-box;
+  margin: 0;
+  vertical-align: top;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .dropdown-arrow {
-  font-size: 10px;
-  margin-left: 4px;
-  transition: transform 0.2s;
+  display: none;
 }
 
 .tab-dropdown-menu {
   position: absolute;
-  top: calc(100% + 4px);
+  top: 100%;
   left: 0;
+  right: 0;
   z-index: 9999;
   background-color: var(--pure-white);
   border: 1px solid var(--border-gray);
-  border-radius: 4px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  min-width: 140px;
-  margin-top: 0;
-  padding: 4px 0;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 100%;
+  width: auto;
+  margin: 0 !important;
+  padding: 0;
   list-style: none;
+  pointer-events: auto;
+  box-sizing: border-box;
+  overflow: visible;
+  line-height: normal;
+  font-size: var(--font-size-base);
+  transform: translateY(0) !important;
 }
 
 .tab-dropdown-item {
-  padding: 12px 16px;
+  padding: 10px 24px;
   font-size: var(--font-size-base);
   color: var(--text-primary);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
   white-space: nowrap;
+  text-align: center;
+  border: 1px solid transparent;
+  border-radius: 0;
+  line-height: normal;
+  box-sizing: border-box;
+  margin: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tab-dropdown-item:first-child {
+  border-radius: 0;
+}
+
+.tab-dropdown-item:last-child {
+  border-radius: 0 0 4px 4px;
 }
 
 .tab-dropdown-item:hover {
   background-color: var(--light-green);
+  color: var(--primary-green);
 }
 
 .tab-dropdown-item.active {
-  background-color: var(--light-green);
-  color: var(--primary-green);
-  font-weight: 500;
+  background-color: var(--primary-green);
+  color: var(--pure-white);
 }
 
 /* 概览卡片样式 */
@@ -761,17 +797,27 @@
   }
 
   .tab-dropdown-container {
-    z-index: 1000;
+    z-index: 1000 !important;
+    position: relative;
   }
 
   .tab-dropdown-menu {
-    z-index: 9999;
-    min-width: 120px;
-    padding: 4px 0;
+    z-index: 99999 !important;
+    min-width: 0 !important;
+    width: auto !important;
+    padding: 0;
+    margin: 0 !important;
+    transform: translateY(0) !important;
+    position: fixed !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
   }
 
   .tab-dropdown-item {
-    padding: 10px 14px;
+    padding: 10px 24px;
     font-size: var(--font-size-base);
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import '../styles/VicePresident.css'
 import { User, SupervisionRecord, classroomsByFloor, getUniqueSupervisionRecords, Notification, AnomalyRecord, AttendanceRecord, classes, getUniqueAttendanceRecords, users } from '../data'
-import { mockApi } from '../services/mockApi'
+import { api } from '../services/api'
 
 interface VicePresidentProps {
   user: User
@@ -52,6 +52,8 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
   const [selectedYear, setSelectedYear] = useState(2026)
   const [selectedMonth, setSelectedMonth] = useState(5)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const dropdownButtonRef = useRef<HTMLButtonElement>(null)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 })
 
   // 获取根据时间变化的问候语
   const getGreeting = () => {
@@ -98,14 +100,39 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
     return () => clearInterval(timer)
   }, [])
 
+  // 移动端下拉菜单位置计算
+  useEffect(() => {
+    if (showOverviewDropdown && window.innerWidth <= 768) {
+      const updatePosition = () => {
+        if (dropdownButtonRef.current) {
+          const rect = dropdownButtonRef.current.getBoundingClientRect()
+          setDropdownPosition({
+            top: rect.bottom,
+            left: rect.left,
+            width: rect.width
+          })
+        }
+      }
+      
+      updatePosition()
+      window.addEventListener('resize', updatePosition)
+      window.addEventListener('scroll', updatePosition)
+      
+      return () => {
+        window.removeEventListener('resize', updatePosition)
+        window.removeEventListener('scroll', updatePosition)
+      }
+    }
+  }, [showOverviewDropdown])
+
   const loadData = async () => {
     const date = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
     const [supervision, attendance, notifications, anomalyCount, anomalies] = await Promise.all([
-      mockApi.supervision.getAll(),
-      mockApi.attendance.getAll(),
-      mockApi.notifications.getAll(),
-      mockApi.anomalies.getTodayCount(),
-      mockApi.anomalies.getByDate(date)
+      api.supervision.getAll(),
+      api.attendance.getAll(),
+      api.notifications.getAll(),
+      api.anomalies.getTodayCount(),
+      api.anomalies.getByDate(date)
     ])
     setSupervisionRecords(supervision)
     setAttendanceRecords(attendance)
@@ -141,8 +168,8 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
 
   // 关闭通知
   const handleCloseNotification = async (id: string) => {
-    await mockApi.notifications.markAsRead(id)
-    const updated = await mockApi.notifications.getAll()
+    await api.notifications.markAsRead(id)
+    const updated = await api.notifications.getAll()
     setNotifications(updated)
   }
 
@@ -151,15 +178,20 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
     loadData()
   }, [activeTab])
 
-  // 点击外部关闭下拉菜单
+  // 点击外部关闭下拉菜单（同时支持鼠标和触摸事件）
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setShowOverviewDropdown(false)
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    document.addEventListener('mousedown', handleClickOutside as EventListener)
+    document.addEventListener('touchstart', handleClickOutside as EventListener)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside as EventListener)
+      document.removeEventListener('touchstart', handleClickOutside as EventListener)
+    }
   }, [])
 
   // 格式化时段显示
@@ -330,23 +362,35 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
         </div>
       )}
 
-      <div className="tabs">
-        <div className="tab-dropdown-container" ref={dropdownRef}>
+      <div className="tabs-container">
+        <div className="tabs">
+        <div className="tab-dropdown-container" ref={dropdownRef} onMouseLeave={() => setShowOverviewDropdown(false)}>
           <button
+            ref={dropdownButtonRef}
             className={`tab ${activeTab === 'overview' ? 'active' : ''}`}
-            onClick={() => {
-              if (activeTab === 'overview') {
-                setShowOverviewDropdown(!showOverviewDropdown)
-              } else {
+            onClick={(e) => {
+              e.stopPropagation()
+              if (activeTab !== 'overview') {
                 setActiveTab('overview')
+                setShowOverviewDropdown(true)
+              } else {
+                setShowOverviewDropdown(!showOverviewDropdown)
               }
             }}
+            onMouseEnter={() => setShowOverviewDropdown(true)}
           >
             {overviewSubTab === 'attendance' ? '今日考勤' : overviewSubTab === 'inspection' ? '今日查教' : '全局总览'}
-            <span className="dropdown-arrow">▼</span>
           </button>
           {showOverviewDropdown && (
-            <div className="tab-dropdown-menu">
+            <div 
+              className="tab-dropdown-menu"
+              style={window.innerWidth <= 768 ? { 
+                top: `${dropdownPosition.top}px`, 
+                left: `${dropdownPosition.left}px`,
+                width: `${dropdownPosition.width}px`
+              } : {}}
+              onMouseEnter={() => setShowOverviewDropdown(true)}
+            >
               <div
                 className={`tab-dropdown-item ${overviewSubTab === 'attendance' ? 'active' : ''}`}
                 onClick={() => { setOverviewSubTab('attendance'); setShowOverviewDropdown(false) }}
@@ -380,6 +424,7 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
         >
           账户管理
         </button>
+        </div>
       </div>
 
       <main className="main-content">
@@ -1102,23 +1147,23 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                 <thead>
                   <tr>
                     <th>账号</th>
-                    <th>姓名</th>
-                    <th>角色</th>
-                    <th>班级/部门</th>
+                    <th>密码</th>
+                    <th>职位</th>
+                    <th>昵称</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((userItem, index) => (
                     <tr key={index}>
                       <td>{userItem.username}</td>
-                      <td>{userItem.name || '-'}</td>
+                      <td>{userItem.password}</td>
                       <td>
                         {userItem.role === 'classMonitor' && '学委'}
-                        {userItem.role === 'secretary' && '学习部干事'}
-                        {userItem.role === 'cadre' && '学习部干部'}
-                        {userItem.role === 'vicePresident' && '学生会副会长'}
+                        {userItem.role === 'secretary' && '干事'}
+                        {userItem.role === 'cadre' && (userItem.username === 'lsy' ? '部长' : '副部')}
+                        {userItem.role === 'vicePresident' && '副会'}
                       </td>
-                      <td>{userItem.className || '-'}</td>
+                      <td>{userItem.className || userItem.name || '-'}</td>
                     </tr>
                   ))}
                 </tbody>

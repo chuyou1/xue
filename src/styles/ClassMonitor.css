@@ -355,12 +355,12 @@
   display: flex;
   gap: 16px;
   margin-bottom: 20px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .form-group {
   flex: 1;
-  min-width: 0;
+  min-width: 200px;
 }
 
 .form-group label {
