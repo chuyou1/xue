@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import '../styles/VicePresident.css'
-import { User, SupervisionRecord, classroomsByFloor, getUniqueSupervisionRecords, Notification, AnomalyRecord, AttendanceRecord, classes, getUniqueAttendanceRecords, users } from '../data'
+import { User, SupervisionRecord, classroomsByFloor, getUniqueSupervisionRecords, AnomalyRecord, AttendanceRecord, classes, getUniqueAttendanceRecords, users } from '../data'
 import { api } from '../services/api'
 
 interface VicePresidentProps {
@@ -38,15 +38,21 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
   const [currentDisplayTimeSlot, setCurrentDisplayTimeSlot] = useState('')
 
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [notifications, setNotifications] = useState<Notification[]>([])
   const [anomalyCount, setAnomalyCount] = useState(0)
   const [showAnomalyDetail, setShowAnomalyDetail] = useState(false)
   const [todayAnomalyRecords, setTodayAnomalyRecords] = useState<AnomalyRecord[]>([])
   const [showOverviewDropdown, setShowOverviewDropdown] = useState(false)
   const [expandedFloor, setExpandedFloor] = useState<string | null>(null)
   const [selectedAttendanceClassroom, setSelectedAttendanceClassroom] = useState<string | null>(null)
-  const [summaryQueryMode, setSummaryQueryMode] = useState<'period' | 'date'>('date')
-  const [selectedWeek, setSelectedWeek] = useState<number>(11)
+  const [summaryQueryMode, setSummaryQueryMode] = useState<'period' | 'date'>('period')
+  const [selectedWeek, setSelectedWeek] = useState<number>(() => {
+    const startDateOfWeek11 = new Date(2026, 4, 18)
+    const now = new Date()
+    const timeDiff = now.getTime() - startDateOfWeek11.getTime()
+    const dayDiff = timeDiff / (1000 * 3600 * 24)
+    const weekDiff = Math.floor(dayDiff / 7)
+    return 11 + weekDiff
+  })
   const [showDateDetail, setShowDateDetail] = useState(false)
   const [selectedDetailDate, setSelectedDetailDate] = useState<string>('')
   const [selectedYear, setSelectedYear] = useState(2026)
@@ -54,6 +60,10 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const dropdownButtonRef = useRef<HTMLButtonElement>(null)
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 })
+  const [showLeaveMaterials, setShowLeaveMaterials] = useState(false)
+  const [selectedLeaveClassroom, setSelectedLeaveClassroom] = useState<string | null>(null)
+  const [selectedLeaveDate, setSelectedLeaveDate] = useState<string | null>(null)
+  const [selectedLeaveTimeSlot, setSelectedLeaveTimeSlot] = useState<string | null>(null)
 
   // 获取根据时间变化的问候语
   const getGreeting = () => {
@@ -92,13 +102,20 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
     loadData()
   }, [])
 
-  // 每秒更新时间
+  // 每秒更新当前时间，每分钟检查日期是否变化
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date())
+      const now = new Date()
+      setCurrentTime(now)
+      const newDate = now.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
+      if (newDate !== currentDate) {
+        setCurrentDate(newDate)
+        setCurrentTimeSlot(now.getHours() < 12 ? '上午' : '下午')
+        setCurrentDisplayTimeSlot(getDisplayTimeSlot())
+      }
     }, 1000)
     return () => clearInterval(timer)
-  }, [])
+  }, [currentDate])
 
   // 移动端下拉菜单位置计算
   useEffect(() => {
@@ -127,50 +144,16 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
 
   const loadData = async () => {
     const date = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-')
-    const [supervision, attendance, notifications, anomalyCount, anomalies] = await Promise.all([
+    const [supervision, attendance, anomalyCount, anomalies] = await Promise.all([
       api.supervision.getAll(),
       api.attendance.getAll(),
-      api.notifications.getAll(),
       api.anomalies.getTodayCount(),
       api.anomalies.getByDate(date)
     ])
     setSupervisionRecords(supervision)
     setAttendanceRecords(attendance)
-    setNotifications(notifications)
     setAnomalyCount(anomalyCount)
     setTodayAnomalyRecords(anomalies)
-  }
-
-  // 格式化通知时间
-  const formatNotificationTime = (timeString: string) => {
-    const date = new Date(timeString)
-    return date.toLocaleString('zh-CN', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
-  // 获取通知图标
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'attendance_update':
-        return '📋'
-      case 'late_update':
-        return '⏰'
-      case 'absent_update':
-        return '📝'
-      default:
-        return '🔔'
-    }
-  }
-
-  // 关闭通知
-  const handleCloseNotification = async (id: string) => {
-    await api.notifications.markAsRead(id)
-    const updated = await api.notifications.getAll()
-    setNotifications(updated)
   }
 
   // 刷新数据当切换标签时
@@ -331,37 +314,6 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
         </div>
       </header>
 
-      {/* 通知区域 */}
-      {notifications.length > 0 && (
-        <div className="notification-container">
-          <div className="notification-list">
-            {notifications.map((notification) => (
-              <div 
-                key={notification.id} 
-                className={`notification-item ${!notification.isRead ? 'unread' : ''}`}
-              >
-                <span className="notification-icon">
-                  {getNotificationIcon(notification.type)}
-                </span>
-                <div className="notification-content">
-                  <div className="notification-class">{notification.className}</div>
-                  <div className="notification-message">{notification.message}</div>
-                  <div className="notification-time">
-                    {formatNotificationTime(notification.timestamp)}
-                  </div>
-                </div>
-                <button 
-                  className="notification-close"
-                  onClick={() => handleCloseNotification(notification.id)}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="tabs-container">
         <div className="tabs">
         <div className="tab-dropdown-container" ref={dropdownRef} onMouseLeave={() => setShowOverviewDropdown(false)}>
@@ -509,19 +461,29 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                     </div>
                     {expandedFloor === floor && (
                       <div className="classrooms-grid">
-                        {getClassroomsWithAttendance(floor).map((room) => (
-                          <div
-                            key={room}
-                            className="classroom-item"
-                            onClick={() => setSelectedAttendanceClassroom(room)}
-                            style={{
-                              backgroundColor: selectedAttendanceClassroom === room ? '#e8f5e9' : 'white',
-                              borderColor: selectedAttendanceClassroom === room ? '#4caf50' : '#e0e0e0'
-                            }}
-                          >
-                            <span style={{ fontSize: '16px' }}>{room}</span>
-                          </div>
-                        ))}
+                        {getClassroomsWithAttendance(floor).map((room) => {
+                          // 获取该教室今日当前时段的考勤记录
+                          const roomAttendanceRecords = attendanceRecords.filter(
+                            r => r.classroom === room && r.date === currentDate && r.timeSlot === currentTimeSlot
+                          );
+                          // 计算请假学生数量
+                          const leaveCount = roomAttendanceRecords.reduce(
+                            (count, record) => count + (record.leaveStudents?.length || 0), 0
+                          );
+                          return (
+                            <div
+                              key={room}
+                              className="classroom-item"
+                              onClick={() => setSelectedAttendanceClassroom(room)}
+                              style={{
+                                backgroundColor: selectedAttendanceClassroom === room ? '#e8f5e9' : 'white',
+                                borderColor: selectedAttendanceClassroom === room ? '#4caf50' : '#e0e0e0'
+                              }}
+                            >
+                              <span style={{ fontSize: '16px' }}>{room}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -539,6 +501,9 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                   <div className="attendance-records-list">
                     {getClassroomAttendanceRecords(selectedAttendanceClassroom).map((record) => {
                       const classInfo = classes.find(c => c.name === record.className)
+                      const leave = parseInt(record.leave) || 0
+                      const late = parseInt(record.late) || 0
+                      const absent = parseInt(record.absent) || 0
                       return (
                         <div key={record.id} className="attendance-record-item">
                           <div className="record-header">
@@ -567,6 +532,54 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                               <span className="value" style={{ fontSize: '14px' }}>{record.absent || '-'}</span>
                             </div>
                           </div>
+                          
+                          {/* 学生信息展示 */}
+                          <div style={{ marginTop: '16px' }}>
+                            {/* 请假盒子 */}
+                            {leave > 0 && (
+                              <div 
+                                className="student-group-box leave-box leave-materials-clickable"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedLeaveClassroom(selectedAttendanceClassroom);
+                                  setSelectedLeaveDate(currentDate);
+                                  setSelectedLeaveTimeSlot(currentTimeSlot);
+                                  setShowLeaveMaterials(true);
+                                }}
+                              >
+                                <span className="group-label">请假 ({leave})</span>
+                                <div className="student-names">
+                                  {record.leaveStudents?.map((student, idx) => (
+                                    <span key={idx} className="student-name">{student.name}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* 迟到盒子 */}
+                            {late > 0 && (
+                              <div className="student-group-box late-box" style={{ marginTop: '12px' }}>
+                                <span className="group-label">迟到 ({late})</span>
+                                <div className="student-names">
+                                  {record.lateStudents?.map((student, idx) => (
+                                    <span key={idx} className="student-name">{student.name}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* 旷课盒子 */}
+                            {absent > 0 && (
+                              <div className="student-group-box absent-box" style={{ marginTop: '12px' }}>
+                                <span className="group-label">旷课 ({absent})</span>
+                                <div className="student-names">
+                                  {record.absentStudents?.map((student, idx) => (
+                                    <span key={idx} className="student-name">{student.name}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )
                     })}
@@ -587,47 +600,47 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
 
             <div className="section">
               <div className="report-table">
+                <div className="report-title">计科院学风建设督查表</div>
                 <table className="standard-table">
                   <thead>
                     <tr>
-                      <th colSpan={9} className="table-combined-header">
-                        <div className="table-title-row">
-                          计科院学风建设督查表
-                        </div>
-                        <div className="table-info-row">
-                          <span>{new Date().getFullYear()}</span>
-                          <span>年</span>
-                          <span>{new Date().getMonth() + 1}</span>
-                          <span>月</span>
-                          <span>{new Date().getDate()}</span>
-                          <span>日</span>
-                          <span>星期{['日', '一', '二', '三', '四', '五', '六'][new Date().getDay()]}</span>
-                          <span>第</span>
-                          <span>{currentTimeSlot === '上午' ? '1、2' : '5、6'}</span>
-                          <span>节</span>
-                        </div>
+                      <th colSpan={9} className="table-header-info">
+                        <span>{new Date().getFullYear()}</span>
+                        <span>年</span>
+                        <span>{new Date().getMonth() + 1}</span>
+                        <span>月</span>
+                        <span>{new Date().getDate()}</span>
+                        <span>日</span>
+                        <span>星期{['日', '一', '二', '三', '四', '五', '六'][new Date().getDay()]}</span>
+                        <span>第</span>
+                        <span>{currentTimeSlot === '上午' ? '1、2' : '5、6'}</span>
+                        <span>节</span>
+                        <span className="inspector-label">检查人：</span>
+                        <span>{user.name || '未填写'}</span>
                       </th>
                     </tr>
                     <tr>
-                      <th rowSpan={2}>班级</th>
-                      <th rowSpan={2}>辅导员</th>
-                      <th colSpan={5}>考勤情况</th>
-                      <th rowSpan={2}>违纪情况</th>
-                      <th rowSpan={2}>总分</th>
+                      <th rowSpan={2} className="col-wide">班级</th>
+                      <th rowSpan={2} className="col-medium">辅导员</th>
+                      <th colSpan={5} className="attendance-header">考勤</th>
+                      <th rowSpan={2} className="col-narrow">违纪</th>
+                      <th rowSpan={2} className="col-narrow">总分</th>
                     </tr>
                     <tr>
-                      <th>应到</th>
-                      <th>实到</th>
-                      <th>请假</th>
-                      <th>旷课</th>
-                      <th>迟到</th>
+                      <th className="col-narrow">应到</th>
+                      <th className="col-narrow">实到</th>
+                      <th className="col-narrow">请假</th>
+                      <th className="col-narrow">迟到</th>
+                      <th className="col-narrow">旷课</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(() => {
-                      const todaySupervisionRecords = getUniqueSupervisionRecords(supervisionRecords)
-                        .filter(r => r.date === currentDate && r.timeSlot === currentTimeSlot)
-                      if (todaySupervisionRecords.length === 0) {
+                      const filteredRecords = supervisionRecords.filter(r => 
+                        r.date === currentDate && r.timeSlot === currentTimeSlot
+                      )
+                      const uniqueRecords = getUniqueSupervisionRecords(filteredRecords)
+                      if (uniqueRecords.length === 0) {
                         return (
                           <tr>
                             <td colSpan={9} style={{ textAlign: 'center', color: '#999', padding: '40px' }}>
@@ -636,27 +649,31 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                           </tr>
                         )
                       }
-                      return todaySupervisionRecords.map((record) => {
+                      return uniqueRecords.map((record) => {
                         const filteredViolations = record.violations.filter(v => v.type !== 'late')
-                        const typeCount: { [key: string]: number } = {}
-                        filteredViolations.forEach(v => {
-                          const type = violationTypeMap[v.type] || v.type
-                          typeCount[type] = (typeCount[type] || 0) + 1
-                        })
-                        const violationDisplay = Object.entries(typeCount)
-                          .map(([type, count]) => `${type}：${count}`)
-                          .join('，') || '无'
+                        
                         return (
                           <tr key={record.id}>
-                            <td>{record.className}</td>
-                            <td>{record.instructor}</td>
-                            <td>{record.classAttendance?.shouldAttend || '-'}</td>
-                            <td>{record.classAttendance?.present || '-'}</td>
-                            <td>{record.classAttendance && record.classAttendance.leave > 0 ? record.classAttendance.leave : '-'}</td>
-                            <td>{record.classAttendance && record.classAttendance.absent > 0 ? record.classAttendance.absent : '-'}</td>
-                            <td>{record.classAttendance && record.classAttendance.late > 0 ? record.classAttendance.late : '-'}</td>
-                            <td>{violationDisplay}</td>
-                            <td>{record.score}分</td>
+                            <td className="col-wide">{record.className}</td>
+                            <td className="col-medium">{record.instructor}</td>
+                            <td className="col-narrow">{record.classAttendance?.shouldAttend || ''}</td>
+                            <td className="col-narrow">{record.classAttendance?.present || ''}</td>
+                            <td className="col-narrow">{record.classAttendance && record.classAttendance.leave > 0 ? record.classAttendance.leave : ''}</td>
+                            <td className="col-narrow">{record.classAttendance && record.classAttendance.late > 0 ? record.classAttendance.late : ''}</td>
+                            <td className="col-narrow">{record.classAttendance && record.classAttendance.absent > 0 ? record.classAttendance.absent : ''}</td>
+                            <td className="col-narrow">
+                              {filteredViolations.length === 0 ? '无' : (() => {
+                                const typeCount: { [key: string]: number } = {}
+                                filteredViolations.forEach(v => {
+                                  const type = violationTypeMap[v.type] || v.type
+                                  typeCount[type] = (typeCount[type] || 0) + 1
+                                })
+                                return Object.entries(typeCount)
+                                  .map(([type, count]) => `${type}：${count}`)
+                                  .join('，')
+                              })()}
+                            </td>
+                            <td className="col-narrow">{record.score}</td>
                           </tr>
                         )
                       })
@@ -831,9 +848,6 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                       {dayInfo.day > 0 && (
                         <>
                           <span className="cell-day">{dayInfo.day}</span>
-                          {dayInfo.hasRecords && (
-                            <span className="cell-dot"></span>
-                          )}
                         </>
                       )}
                     </div>
@@ -854,7 +868,7 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                   setSelectedDetailDate('')
                 }}
               >
-                ← 返回
+                返回
               </button>
               <h3 className="detail-title">{selectedDetailDate} 考勤详情</h3>
             </div>
@@ -874,67 +888,67 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
               <div className="attendance-section">
                 <h4>{selectedDetailDate} 上午考勤表</h4>
                 <div className="report-table">
+                  <div className="report-title">计科院学风建设督查表</div>
                   <table className="standard-table">
                     <thead>
                       <tr>
-                        <th colSpan={9} className="table-combined-header">
-                          <div className="table-title-row">
-                            计科院学风建设督查表
-                          </div>
-                          <div className="table-info-row">
-                            {(() => {
-                              const dateParts = selectedDetailDate.split('-')
-                              const year = dateParts[0]
-                              const month = dateParts[1]
-                              const day = dateParts[2]
-                              const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
-                              const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
-                              return (
-                                <>
-                                  <span>{year}</span>
-                                  <span>年</span>
-                                  <span>{month}</span>
-                                  <span>月</span>
-                                  <span>{day}</span>
-                                  <span>日</span>
-                                  <span>星期{weekday}</span>
-                                  <span>第</span>
-                                  <span>1、2</span>
-                                  <span>节</span>
-                                  <span style={{ marginLeft: '20px' }}>检查人：</span>
-                                  <span>{(() => {
-                                    const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords).filter(r => r.date === selectedDetailDate && r.timeSlot === '上午')
-                                    if (uniqueRecords.length > 0) {
-                                      const inspectors = Array.from(new Set(uniqueRecords.map(r => r.inspector))).filter(Boolean)
-                                      return inspectors.join('、') || '未填写'
-                                    }
-                                    return ''
-                                  })()}</span>
-                                </>
-                              )
-                            })()}
-                          </div>
+                        <th colSpan={9} className="table-header-info">
+                          {(() => {
+                            const dateParts = selectedDetailDate.split('-')
+                            const year = dateParts[0]
+                            const month = dateParts[1]
+                            const day = dateParts[2]
+                            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                            const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
+                            const inspectorValue = (() => {
+                              const filteredRecords = supervisionRecords.filter(r => r.date === selectedDetailDate && r.timeSlot === '上午')
+                              const uniqueRecords = getUniqueSupervisionRecords(filteredRecords)
+                              if (uniqueRecords.length > 0) {
+                                const inspectors = Array.from(new Set(uniqueRecords.map(r => r.inspector))).filter(Boolean)
+                                return inspectors.join('、') || '未填写'
+                              }
+                              return ''
+                            })()
+                            return (
+                              <>
+                                <span>{year}</span>
+                                <span>年</span>
+                                <span>{month}</span>
+                                <span>月</span>
+                                <span>{day}</span>
+                                <span>日</span>
+                                <span>星期{weekday}</span>
+                                <span>第</span>
+                                <span>1、2</span>
+                                <span>节</span>
+                                <span className="inspector-label">检查人：</span>
+                                <span>{inspectorValue}</span>
+                              </>
+                            )
+                          })()}
                         </th>
                       </tr>
                       <tr>
-                        <th rowSpan={2}>班级</th>
-                        <th rowSpan={2}>辅导员</th>
-                        <th colSpan={5}>考勤情况</th>
-                        <th rowSpan={2}>违纪情况</th>
-                        <th rowSpan={2}>总分</th>
+                        <th rowSpan={2} className="equal-width">班级</th>
+                        <th rowSpan={2} className="equal-width">辅导员</th>
+                        <th colSpan={5} className="attendance-header">考勤</th>
+                        <th rowSpan={2} className="equal-width">违纪</th>
+                        <th rowSpan={2} className="equal-width">总分</th>
                       </tr>
                       <tr>
-                        <th>应到</th>
-                        <th>实到</th>
-                        <th>请假</th>
-                        <th>旷课</th>
-                        <th>迟到</th>
+                        <th className="equal-width">应到</th>
+                        <th className="equal-width">实到</th>
+                        <th className="equal-width">请假</th>
+                        <th className="equal-width">旷课</th>
+                        <th className="equal-width">迟到</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(() => {
-                        const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords)
-                          .filter(r => r.date === selectedDetailDate && r.timeSlot === '上午')
+                        const filteredRecords = supervisionRecords.filter(r => 
+                          r.date === selectedDetailDate && r.timeSlot === '上午'
+                        )
+                        const uniqueRecords = getUniqueSupervisionRecords(filteredRecords)
                         if (uniqueRecords.length === 0) {
                             const now = new Date()
                             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -961,16 +975,16 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                             .join('，') || '无'
                           return (
                             <tr key={record.id}>
-                              <td>{record.className}</td>
-                              <td>{record.instructor}</td>
-                              <td>{record.classAttendance?.shouldAttend || '-'}</td>
-                              <td>{record.classAttendance?.present || '-'}</td>
-                              <td>{record.classAttendance && record.classAttendance.leave > 0 ? record.classAttendance.leave : '-'}</td>
-                              <td>{record.classAttendance && record.classAttendance.absent > 0 ? record.classAttendance.absent : '-'}</td>
-                              <td>{record.classAttendance && record.classAttendance.late > 0 ? record.classAttendance.late : '-'}</td>
-                              <td>{violationDisplay}</td>
-                              <td>{record.score}分</td>
-                            </tr>
+                            <td className="equal-width">{record.className}</td>
+                            <td className="equal-width">{record.instructor}</td>
+                            <td className="equal-width">{record.classAttendance?.shouldAttend || ''}</td>
+                            <td className="equal-width">{record.classAttendance?.present || ''}</td>
+                            <td className="equal-width">{record.classAttendance && record.classAttendance.leave > 0 ? record.classAttendance.leave : ''}</td>
+                            <td className="equal-width">{record.classAttendance && record.classAttendance.late > 0 ? record.classAttendance.late : ''}</td>
+                            <td className="equal-width">{record.classAttendance && record.classAttendance.absent > 0 ? record.classAttendance.absent : ''}</td>
+                            <td className="equal-width">{violationDisplay}</td>
+                            <td className="equal-width">{record.score}</td>
+                          </tr>
                           )
                         })
                       })()}
@@ -979,10 +993,16 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                 </div>
                 <div className="photos-section">
                   {(() => {
-                    const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords)
-                      .filter(r => r.date === selectedDetailDate && r.timeSlot === '上午')
+                    const filteredRecords = supervisionRecords.filter(r => 
+                      r.date === selectedDetailDate && r.timeSlot === '上午'
+                    )
+                    const uniqueRecords = getUniqueSupervisionRecords(filteredRecords)
                     const allPhotos = uniqueRecords.flatMap(record => 
-                      record.violations.filter(v => v.photo).map(v => ({ ...v, className: record.className }))
+                      record.violations.filter(v => v.photo).map(v => ({ 
+                        ...v, 
+                        className: record.className,
+                        instructor: record.instructor
+                      }))
                     )
                     if (allPhotos.length > 0) {
                       return (
@@ -992,7 +1012,12 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                             {allPhotos.map((photo, index) => (
                               <div key={index} className="photo-wrapper">
                                 <img src={photo.photo} alt="违纪照片" className="detail-photo" />
-                                <div className="photo-caption">{photo.className}</div>
+                                <div className="photo-caption">
+                                  <div>姓名：{photo.name}</div>
+                                  <div>班级：{photo.className}</div>
+                                  <div>辅导员：{photo.instructor}</div>
+                                  <div>违纪类型：{violationTypeMap[photo.type] || photo.type}</div>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -1007,67 +1032,67 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
               <div className="attendance-section">
                 <h4>{selectedDetailDate} 下午考勤表</h4>
                 <div className="report-table">
+                  <div className="report-title">计科院学风建设督查表</div>
                   <table className="standard-table">
                     <thead>
                       <tr>
-                        <th colSpan={9} className="table-combined-header">
-                          <div className="table-title-row">
-                            计科院学风建设督查表
-                          </div>
-                          <div className="table-info-row">
-                            {(() => {
-                              const dateParts = selectedDetailDate.split('-')
-                              const year = dateParts[0]
-                              const month = dateParts[1]
-                              const day = dateParts[2]
-                              const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
-                              const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
-                              return (
-                                <>
-                                  <span>{year}</span>
-                                  <span>年</span>
-                                  <span>{month}</span>
-                                  <span>月</span>
-                                  <span>{day}</span>
-                                  <span>日</span>
-                                  <span>星期{weekday}</span>
-                                  <span>第</span>
-                                  <span>5、6</span>
-                                  <span>节</span>
-                                  <span style={{ marginLeft: '20px' }}>检查人：</span>
-                                  <span>{(() => {
-                                    const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords).filter(r => r.date === selectedDetailDate && r.timeSlot === '下午')
-                                    if (uniqueRecords.length > 0) {
-                                      const inspectors = Array.from(new Set(uniqueRecords.map(r => r.inspector))).filter(Boolean)
-                                      return inspectors.join('、') || '未填写'
-                                    }
-                                    return ''
-                                  })()}</span>
-                                </>
-                              )
-                            })()}
-                          </div>
+                        <th colSpan={9} className="table-header-info">
+                          {(() => {
+                            const dateParts = selectedDetailDate.split('-')
+                            const year = dateParts[0]
+                            const month = dateParts[1]
+                            const day = dateParts[2]
+                            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+                            const weekday = ['日', '一', '二', '三', '四', '五', '六'][date.getDay()]
+                            const inspectorValue = (() => {
+                              const filteredRecords = supervisionRecords.filter(r => r.date === selectedDetailDate && r.timeSlot === '下午')
+                              const uniqueRecords = getUniqueSupervisionRecords(filteredRecords)
+                              if (uniqueRecords.length > 0) {
+                                const inspectors = Array.from(new Set(uniqueRecords.map(r => r.inspector))).filter(Boolean)
+                                return inspectors.join('、') || '未填写'
+                              }
+                              return ''
+                            })()
+                            return (
+                              <>
+                                <span>{year}</span>
+                                <span>年</span>
+                                <span>{month}</span>
+                                <span>月</span>
+                                <span>{day}</span>
+                                <span>日</span>
+                                <span>星期{weekday}</span>
+                                <span>第</span>
+                                <span>5、6</span>
+                                <span>节</span>
+                                <span className="inspector-label">检查人：</span>
+                                <span>{inspectorValue}</span>
+                              </>
+                            )
+                          })()}
                         </th>
                       </tr>
                       <tr>
-                        <th rowSpan={2}>班级</th>
-                        <th rowSpan={2}>辅导员</th>
-                        <th colSpan={5}>考勤情况</th>
-                        <th rowSpan={2}>违纪情况</th>
-                        <th rowSpan={2}>总分</th>
+                        <th rowSpan={2} className="equal-width">班级</th>
+                        <th rowSpan={2} className="equal-width">辅导员</th>
+                        <th colSpan={5} className="attendance-header">考勤</th>
+                        <th rowSpan={2} className="equal-width">违纪</th>
+                        <th rowSpan={2} className="equal-width">总分</th>
                       </tr>
                       <tr>
-                        <th>应到</th>
-                        <th>实到</th>
-                        <th>请假</th>
-                        <th>旷课</th>
-                        <th>迟到</th>
+                        <th className="equal-width">应到</th>
+                        <th className="equal-width">实到</th>
+                        <th className="equal-width">请假</th>
+                        <th className="equal-width">旷课</th>
+                        <th className="equal-width">迟到</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(() => {
-                        const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords)
-                          .filter(r => r.date === selectedDetailDate && r.timeSlot === '下午')
+                        const filteredRecords = supervisionRecords.filter(r => 
+                          r.date === selectedDetailDate && r.timeSlot === '下午'
+                        )
+                        const uniqueRecords = getUniqueSupervisionRecords(filteredRecords)
                         if (uniqueRecords.length === 0) {
                             const now = new Date()
                             const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -1094,28 +1119,35 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                             .join('，') || '无'
                           return (
                             <tr key={record.id}>
-                              <td>{record.className}</td>
-                              <td>{record.instructor}</td>
-                              <td>{record.classAttendance?.shouldAttend || '-'}</td>
-                              <td>{record.classAttendance?.present || '-'}</td>
-                              <td>{record.classAttendance && record.classAttendance.leave > 0 ? record.classAttendance.leave : '-'}</td>
-                              <td>{record.classAttendance && record.classAttendance.absent > 0 ? record.classAttendance.absent : '-'}</td>
-                              <td>{record.classAttendance && record.classAttendance.late > 0 ? record.classAttendance.late : '-'}</td>
-                              <td>{violationDisplay}</td>
-                              <td>{record.score}分</td>
-                            </tr>
+                            <td className="equal-width">{record.className}</td>
+                            <td className="equal-width">{record.instructor}</td>
+                            <td className="equal-width">{record.classAttendance?.shouldAttend || ''}</td>
+                            <td className="equal-width">{record.classAttendance?.present || ''}</td>
+                            <td className="equal-width">{record.classAttendance && record.classAttendance.leave > 0 ? record.classAttendance.leave : ''}</td>
+                            <td className="equal-width">{record.classAttendance && record.classAttendance.late > 0 ? record.classAttendance.late : ''}</td>
+                            <td className="equal-width">{record.classAttendance && record.classAttendance.absent > 0 ? record.classAttendance.absent : ''}</td>
+                            <td className="equal-width">{violationDisplay}</td>
+                            <td className="equal-width">{record.score}</td>
+                          </tr>
                           )
                         })
                       })()}
                     </tbody>
                   </table>
                 </div>
+
                 <div className="photos-section">
                   {(() => {
-                    const uniqueRecords = getUniqueSupervisionRecords(supervisionRecords)
-                      .filter(r => r.date === selectedDetailDate && r.timeSlot === '下午')
+                    const filteredRecords = supervisionRecords.filter(r => 
+                      r.date === selectedDetailDate && r.timeSlot === '下午'
+                    )
+                    const uniqueRecords = getUniqueSupervisionRecords(filteredRecords)
                     const allPhotos = uniqueRecords.flatMap(record => 
-                      record.violations.filter(v => v.photo).map(v => ({ ...v, className: record.className }))
+                      record.violations.filter(v => v.photo).map(v => ({ 
+                        ...v, 
+                        className: record.className,
+                        instructor: record.instructor
+                      }))
                     )
                     if (allPhotos.length > 0) {
                       return (
@@ -1125,7 +1157,12 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                             {allPhotos.map((photo, index) => (
                               <div key={index} className="photo-wrapper">
                                 <img src={photo.photo} alt="违纪照片" className="detail-photo" />
-                                <div className="photo-caption">{photo.className}</div>
+                                <div className="photo-caption">
+                                  <div>姓名：{photo.name}</div>
+                                  <div>班级：{photo.className}</div>
+                                  <div>辅导员：{photo.instructor}</div>
+                                  <div>违纪类型：{violationTypeMap[photo.type] || photo.type}</div>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -1171,6 +1208,76 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
             </div>
           </div>
         )}
+
+        {/* 请假材料弹窗 */}
+        {showLeaveMaterials && selectedLeaveClassroom && selectedLeaveDate && selectedLeaveTimeSlot && (
+          <div 
+            className="leave-materials-modal" 
+            onClick={() => setShowLeaveMaterials(false)}
+          >
+            <div 
+              className="leave-materials-modal-content" 
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="leave-materials-modal-header">
+              <h4 style={{ fontSize: '16px', margin: 0 }}>{selectedLeaveClassroom} 请假材料</h4>
+              <button className="close-btn" onClick={() => setShowLeaveMaterials(false)}>×</button>
+            </div>
+            <div className="leave-materials-modal-body">
+              {(() => {
+                const filteredAttendance = attendanceRecords.filter(r => 
+                  r.classroom === selectedLeaveClassroom && 
+                  r.date === selectedLeaveDate && 
+                  r.timeSlot === selectedLeaveTimeSlot
+                );
+                const allLeaveStudents = filteredAttendance.flatMap(record => 
+                  (record.leaveStudents || []).map(student => ({ 
+                    ...student, 
+                    className: record.className,
+                    instructor: record.instructor
+                  }))
+                );
+                
+                if (allLeaveStudents.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', color: '#999', padding: '40px' }}>
+                      暂无请假材料
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div className="leave-materials-section">
+                    {allLeaveStudents.map((student, index) => (
+                      <div key={index} className="leave-material-item">
+                        <div className="leave-student-info">
+                          <div>姓名：{student.name}</div>
+                        </div>
+                        {student.specialNote && (
+                          <div className="leave-note">
+                            <span className="note-label">特殊情况说明：</span>
+                            <span className="note-text">{student.specialNote}</span>
+                          </div>
+                        )}
+                        {student.photoUrl && (
+                          <div className="leave-photo-wrapper">
+                            <span className="photo-label">请假材料</span>
+                            <img 
+                              src={student.photoUrl} 
+                              alt={`${student.name} 的请假证明`}
+                              className="leave-photo-image"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
       </main>
     </div>
   )

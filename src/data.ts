@@ -112,7 +112,7 @@ export const getClassInfo = (className: string): ClassInfo | undefined => {
   return classes.find(c => c.name === className)
 }
 
-export let classroomsByFloor = {
+export let classroomsByFloor: { [key: string]: string[] } = {
   '9F': ['903', '904'],
   '6-8F': [],
   '5F': ['501', '502', '503', '504', '505', '506', '507'],
@@ -192,6 +192,7 @@ export interface LeaveStudentInfo {
   name: string
   hasPhoto: boolean
   specialNote?: string
+  photoUrl?: string
 }
 
 // 提交阶段类型
@@ -237,7 +238,7 @@ export interface SupervisionRecord {
   instructor: string
   inspector: string
   leaveVerified: boolean
-  violations: { name: string; type: string; photo?: string }[]
+  violations: { name: string; type: string; photo?: string; className: string; instructor: string }[]
   score: number
   status: 'draft' | 'submitted'
   createdAt: string

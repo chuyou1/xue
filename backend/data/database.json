@@ -593,37 +593,65 @@
   ],
   "attendance": [
     {
-      "date": "2026-05-21",
+      "date": "2026-05-25",
       "timeSlot": "下午",
-      "classroom": "406",
-      "present": "37",
+      "classroom": "401",
+      "present": "30",
       "leave": "",
       "late": "",
       "absent": "",
-      "submittedAt": "2026-05-21T05:46:27.167Z",
-      "stage": "update",
-      "className": "软件2402",
-      "instructor": "周焕哲",
+      "submittedAt": "2026-05-25T04:46:40.775Z",
+      "stage": "initial",
+      "className": "大数据2401",
+      "instructor": "汪财源",
       "source": "classMonitor",
-      "id": "1779342387173"
+      "id": "1779684400787"
     },
     {
-      "date": "2026-05-21",
+      "date": "2026-05-25",
       "timeSlot": "上午",
       "classroom": "406",
-      "present": "37",
-      "leave": "",
+      "present": "36",
+      "leave": "1",
       "late": "",
       "absent": "",
-      "submittedAt": "2026-05-20T21:41:45.051Z",
-      "stage": "initial",
+      "submittedAt": "2026-05-24T23:59:54.580Z",
+      "stage": "update",
+      "leaveStudents": [
+        {
+          "name": "徐航",
+          "hasPhoto": true,
+          "photoUrl": "http://localhost:4000/uploads/1779667194500.jpg"
+        }
+      ],
       "className": "软件2402",
       "instructor": "周焕哲",
       "source": "classMonitor",
-      "id": "1779313305064"
+      "id": "1779667194585"
     }
   ],
   "supervision": [
+    {
+      "date": "2026-05-25",
+      "timeSlot": "下午",
+      "classroom": "401",
+      "className": "大数据2401",
+      "instructor": "汪财源",
+      "inspector": "王婷",
+      "leaveVerified": false,
+      "violations": [],
+      "score": 100,
+      "status": "submitted",
+      "createdAt": "2026-05-25T04:47:23.833Z",
+      "classAttendance": {
+        "shouldAttend": 30,
+        "present": 30,
+        "leave": 0,
+        "late": 0,
+        "absent": 0
+      },
+      "id": "1779684443840"
+    },
     {
       "date": "2026-05-21",
       "timeSlot": "上午",
@@ -646,7 +674,24 @@
       "id": "1779313352549"
     }
   ],
-  "notifications": [],
+  "notifications": [
+    {
+      "type": "attendance_update",
+      "className": "数媒2402",
+      "message": "数媒2402 提交考勤：迟到1人（黄开煜），旷课1人（白怡波）",
+      "id": "1779438422972",
+      "timestamp": "2026-05-22T08:27:02.972Z",
+      "isRead": true
+    }
+  ],
   "anomalies": [],
-  "images": []
+  "images": [
+    {
+      "filename": "1779667194500.jpg",
+      "originalName": "å¾®ä¿¡å¾ç_20260518034000_1167_2.jpg",
+      "url": "http://localhost:4000/uploads/1779667194500.jpg",
+      "createdAt": "2026-05-24T23:59:54.519Z",
+      "id": "1779667194519"
+    }
+  ]
 }

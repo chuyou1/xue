@@ -4,6 +4,31 @@
   box-sizing: border-box;
 }
 
+/* 滚动条样式 - 最细样式 */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
 :root {
   --primary-green: #36B37E;
   --light-green: #E6F7EF;
@@ -24,6 +49,9 @@
 
 html {
   font-size: 16px;
+  overflow-x: hidden;
+  max-width: 100vw;
+  height: 100%;
 }
 
 body {
@@ -32,14 +60,66 @@ body {
   background-color: var(--pure-white);
   line-height: 1.6;
   font-size: var(--font-size-base);
-  min-width: 320px;
+  min-width: unset;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
   margin: 0;
   padding: 0;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
 }
 
 #root {
-  min-height: 100vh;
+  min-height: 100%;
+  height: 100%;
   width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+.responsive-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overflow-y: visible;
+  max-width: 100%;
+}
+
+.responsive-table-wrapper table {
+  margin: 0 auto;
+  min-width: auto !important;
+  width: 100%;
+}
+
+.responsive-table-scaled {
+  transform-origin: top left;
+  transform: scale(1);
+  width: max-content;
+}
+
+@media screen and (max-width: 768px) {
+  .responsive-table-scaled {
+    transform: scale(0.9);
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .responsive-table-scaled {
+    transform: scale(0.75);
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .responsive-table-scaled {
+    transform: scale(0.6);
+  }
+}
+
+@media screen and (max-width: 380px) {
+  .responsive-table-scaled {
+    transform: scale(0.5);
+  }
 }
 
 .container {
@@ -57,7 +137,6 @@ body {
 
 .header {
   background-color: var(--pure-white);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   padding: 0;
   flex-shrink: 0;
   height: var(--header-height);
@@ -68,14 +147,13 @@ body {
 }
 
 .header-content {
-  max-width: var(--max-width);
-  margin: 0 auto;
+  width: 100%;
   padding: 0 calc(var(--gutter) / 2);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
   height: 100%;
+  box-sizing: border-box;
 }
 
 .header-content h2 {
@@ -105,7 +183,6 @@ body {
   background-color: var(--pure-white);
   padding: 0;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   position: relative;
   z-index: 20;
   overflow: visible;
@@ -120,6 +197,7 @@ body {
   box-sizing: border-box;
   overflow-y: visible;
   position: relative;
+  max-width: none;
 }
 
 .tab {
@@ -146,7 +224,7 @@ body {
 
 .main-content {
   width: 100%;
-  min-height: calc(100vh - var(--header-height) - var(--tabs-height));
+  min-height: calc(100% - var(--header-height) - var(--tabs-height));
   position: relative;
   z-index: 10;
 }
@@ -155,7 +233,7 @@ body {
   background-color: var(--pure-white);
   width: 100%;
   min-height: 100%;
-  padding: var(--gutter);
+  padding: 0;
   box-sizing: border-box;
 }
 
@@ -187,6 +265,7 @@ body {
   font-size: var(--font-size-base);
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: none;
 }
 
 .secondary-btn:hover {
@@ -221,7 +300,8 @@ body {
   gap: 12px;
   margin-top: var(--gutter);
   padding-top: var(--gutter);
-  border-top: 1px solid var(--border-gray);
+  border-top: 1px solid #FFFFFF;
+  box-shadow: none;
 }
 
 .empty-state {
@@ -434,6 +514,7 @@ input, select, textarea {
   
   html {
     font-size: 14px;
+    overflow-x: hidden;
   }
   
   body {
@@ -485,11 +566,16 @@ input, select, textarea {
   .main-content {
     z-index: 10;
     position: relative;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
   
   .card {
     padding: calc(var(--gutter) / 2);
-    min-height: calc(100vh - var(--header-height) - var(--tabs-height));
+    min-height: calc(100% - var(--header-height) - var(--tabs-height));
   }
   
   .form-card {
@@ -556,6 +642,7 @@ input, select, textarea {
   
   html {
     font-size: 13px;
+    overflow-x: hidden;
   }
   
   .header {
@@ -572,17 +659,22 @@ input, select, textarea {
   .main-content {
     z-index: 10;
     position: relative;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
-  
+
   .header-content h2 {
     font-size: 1.125rem;
   }
-  
+
   .tab {
     padding: 6px 12px;
     font-size: 0.875rem;
   }
-  
+
   .card {
     padding: 10px;
     border-radius: 0 6px 6px 6px;
@@ -615,6 +707,7 @@ input, select, textarea {
 @media screen and (max-width: 320px) {
   html {
     font-size: 12px;
+    overflow-x: hidden;
   }
   
   .header-content h2 {

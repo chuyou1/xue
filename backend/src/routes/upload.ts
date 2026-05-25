@@ -28,7 +28,7 @@ router.post('/image', upload.single('image'), async (req, res) => {
     }
 
     const { filename, originalname } = req.file
-    const url = `http://localhost:3001/uploads/${filename}`
+    const url = `http://localhost:4000/uploads/${filename}`
     const createdAt = new Date().toISOString()
 
     dbOperations.images.create({

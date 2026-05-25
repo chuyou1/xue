@@ -52,6 +52,7 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
   const [batchNamesInput, setBatchNamesInput] = useState('')
   const [batchLateNamesInput, setBatchLateNamesInput] = useState('')
   const [batchAbsentNamesInput, setBatchAbsentNamesInput] = useState('')
+  const [showDeadlineModal, setShowDeadlineModal] = useState(false)
 
   const [todayRecordId, setTodayRecordId] = useState<string | null>(null)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
@@ -65,24 +66,21 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     const hour = currentTime.getHours()
     const minute = currentTime.getMinutes()
     
-    // 判断是否在课前10分钟（上午8:10上课，下午14:30上课）
-    const isBeforeClass10 = 
-      (hour === 7 && minute >= 50) || 
-      (hour === 14 && minute >= 10 && minute < 20)
-    
-    // 判断是否在课前阶段（上课前10分钟到上课时间）
-    const isBeforeClass = 
-      (hour === 8 && minute >= 0 && minute < 10) || 
-      (hour === 14 && minute >= 20 && minute < 30)
-    
-    // 判断是否在上课后半小时内
-    const isDuringClass = 
-      (hour === 8 && minute >= 10 && minute < 40) || 
-      (hour === 14 && minute >= 30 && minute <= 59) || (hour === 15 && minute === 0)
-    
+    // 判断时段
     const timeSlot = hour < 12 ? '上午' : '下午'
     
-    return { isBeforeClass10, isBeforeClass, isDuringClass, timeSlot }
+    // 判断当前时段是否已关闭（上午截止8:00，下午截止14:20）
+    const isSlotClosed = 
+      (timeSlot === '上午' && (hour > 8 || (hour === 8 && minute >= 0))) ||
+      (timeSlot === '下午' && (hour > 14 || (hour === 14 && minute >= 20)))
+    
+    // 判断是否在截止时间之前可提交
+    const isBeforeDeadline = !isSlotClosed
+    
+    // 判断是否超过截止时间
+    const isAfterDeadline = isSlotClosed
+    
+    return { isBeforeDeadline, isAfterDeadline, timeSlot, isSlotClosed }
   }
 
   // 检查今天是否已有初始提交
@@ -367,7 +365,13 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
-    getTimeStatus()
+    const { isSlotClosed } = getTimeStatus()
+    
+    // 检查是否已超过截止时间
+    if (isSlotClosed) {
+      setShowDeadlineModal(true)
+      return
+    }
     
     if (!classroom.trim()) {
       setValidationError('请填写教室编号')
@@ -425,11 +429,26 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     const absentCount = parseInt(absent) || 0
     const { timeSlot } = getTimeStatus()
     
-    const leaveStudentInfos: LeaveStudentInfo[] = leaveStudents.map(student => ({
-      name: student.name,
-      hasPhoto: !!student.photo,
-      specialNote: specialNotes[student.name]
-    }))
+    // 先上传所有照片并获取URL
+    const leaveStudentInfos: LeaveStudentInfo[] = []
+    for (const student of leaveStudents) {
+      let photoUrl = undefined
+      if (student.photo) {
+        try {
+          const result = await api.upload.image(student.photo)
+          photoUrl = result.url
+        } catch (err) {
+          console.error('照片上传失败:', err)
+        }
+      }
+      
+      leaveStudentInfos.push({
+        name: student.name,
+        hasPhoto: !!student.photo,
+        photoUrl: photoUrl,
+        specialNote: specialNotes[student.name]
+      })
+    }
     
     const lateStudentInfos: StudentNameInfo[] = lateStudents.map(student => ({
       name: student.name
@@ -459,26 +478,6 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
     
     try {
       const savedRecord = await api.attendance.create(newRecord)
-      
-      const hasException = (lateCount > 0 || absentCount > 0)
-      if (hasException) {
-        const parts: string[] = []
-        if (lateCount > 0) {
-          parts.push(`迟到${lateCount}人（${lateStudents.map(s => s.name).join('、')}）`)
-        }
-        if (absentCount > 0) {
-          parts.push(`旷课${absentCount}人（${absentStudents.map(s => s.name).join('、')}）`)
-        }
-        const notificationType: 'attendance_update' | 'late_update' | 'absent_update' = 
-          lateCount > 0 && absentCount > 0 ? 'attendance_update' : (lateCount > 0 ? 'late_update' : 'absent_update')
-        const message = `${user.className} 提交考勤：${parts.join('，')}`
-        
-        await api.notifications.create({
-          type: notificationType,
-          className: user.className || '未知班级',
-          message
-        })
-      }
       
       setTodayRecordId(savedRecord.id)
       setAttendanceRecords([{
@@ -569,40 +568,24 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
             {/* 时间状态提示 */}
             <div className="time-status">
               {(() => {
-                const { isBeforeClass10, isBeforeClass, isDuringClass, timeSlot } = getTimeStatus();
-                if (isBeforeClass10) {
+                const { timeSlot, isSlotClosed } = getTimeStatus();
+                const deadline = timeSlot === '上午' ? '8:00' : '14:20';
+                
+                if (!isSlotClosed) {
                   return (
                     <div className="status-info">
                       <span className="status-icon">📋</span>
                       <span className="status-text">
-                        课前10分钟截止（{timeSlot === '上午' ? '8:00' : '14:20'}）：请提交考勤
-                      </span>
-                    </div>
-                  );
-                } else if (isBeforeClass) {
-                  return (
-                    <div className="status-info">
-                      <span className="status-icon">⏰</span>
-                      <span className="status-text">
-                        课前阶段（{timeSlot === '上午' ? '8:00-8:10' : '14:20-14:30'}）：请提交迟到信息
-                      </span>
-                    </div>
-                  );
-                } else if (isDuringClass) {
-                  return (
-                    <div className="status-info">
-                      <span className="status-icon">📝</span>
-                      <span className="status-text">
-                        上课阶段（{timeSlot === '上午' ? '8:10-8:40' : '14:30-15:00'}）：请提交旷课信息
+                        {timeSlot}时段：请在{deadline}前提交考勤
                       </span>
                     </div>
                   );
                 } else {
                   return (
-                    <div className="status-info">
-                      <span className="status-icon">📋</span>
+                    <div className="status-info status-closed">
+                      <span className="status-icon">⏰</span>
                       <span className="status-text">
-                        课前10分钟截止（{timeSlot === '上午' ? '8:00' : '14:20'}）：请提交考勤
+                        {timeSlot}时段已截止（{deadline}），无法提交
                       </span>
                     </div>
                   );
@@ -805,41 +788,47 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
               <div className="history-list">
                 {attendanceRecords.map((record) => (
                   <div key={record.id} className="history-item">
-                    <div className="history-info">
-                      <span>{formatDateTime(record.submittedAt)}</span>
-                      <span>教室：{record.classroom}</span>
-                      <span>实到：{record.present}</span>
-                      <span>请假：{record.leave && record.leave !== '0' ? record.leave : '-'}</span>
-                      <span>迟到：{record.late && record.late !== '0' ? record.late : '-'}</span>
-                      <span>旷课：{record.absent && record.absent !== '0' ? record.absent : '-'}</span>
+                    <div className="history-main">
+                      <div className="history-info">
+                        <div className="history-info-top">
+                          <span>{formatDateTime(record.submittedAt)}</span>
+                          <span>教室：{record.classroom}</span>
+                        </div>
+                        <div className="history-info-bottom">
+                          <span>实到：{record.present}</span>
+                          {record.leave && record.leave !== '0' && (
+                            <span>请假：{record.leave}</span>
+                          )}
+                          {record.late && record.late !== '0' && (
+                            <span>迟到：{record.late}</span>
+                          )}
+                          {record.absent && record.absent !== '0' && (
+                            <span>旷课：{record.absent}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="history-status-container">
+                        <span className="history-status">已提交</span>
+                      </div>
                     </div>
                     {record.leaveStudents && record.leaveStudents.length > 0 && (
                       <div className="history-students">
                         <span className="history-students-label">请假：</span>
-                        {record.leaveStudents.map((s, i) => (
-                          <span key={i} className="history-student-tag">{s.name}</span>
-                        ))}
+                        <span>{record.leaveStudents.map((s) => s.name).join('、')}</span>
                       </div>
                     )}
                     {record.lateStudents && record.lateStudents.length > 0 && (
                       <div className="history-students">
                         <span className="history-students-label">迟到：</span>
-                        {record.lateStudents.map((s, i) => (
-                          <span key={i} className="history-student-tag">{s.name}</span>
-                        ))}
+                        <span>{record.lateStudents.map((s) => s.name).join('、')}</span>
                       </div>
                     )}
                     {record.absentStudents && record.absentStudents.length > 0 && (
                       <div className="history-students">
                         <span className="history-students-label">旷课：</span>
-                        {record.absentStudents.map((s, i) => (
-                          <span key={i} className="history-student-tag">{s.name}</span>
-                        ))}
+                        <span>{record.absentStudents.map((s) => s.name).join('、')}</span>
                       </div>
                     )}
-                    <div className="history-actions">
-                      <span className="history-status">已提交</span>
-                    </div>
                   </div>
                 ))}
               </div>
@@ -900,6 +889,25 @@ function ClassMonitor({ user, onLogout }: ClassMonitorProps) {
                   clearTimeout(successModalTimerRef.current)
                 }
               }}>
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 截止时间弹窗 */}
+      {showDeadlineModal && (
+        <div className="modal-overlay" onClick={() => setShowDeadlineModal(false)}>
+          <div className="modal deadline-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>提交已截止</h3>
+            </div>
+            <div className="modal-body">
+              <p>{getTimeStatus().timeSlot}时段提交已截止，请等待下一时间段或联系干事补录</p>
+            </div>
+            <div className="modal-footer">
+              <button className="confirm-btn" onClick={() => setShowDeadlineModal(false)}>
                 确定
               </button>
             </div>
