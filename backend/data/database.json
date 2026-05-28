@@ -593,6 +593,21 @@
   ],
   "attendance": [
     {
+      "date": "2026-05-28",
+      "timeSlot": "下午",
+      "classroom": "406",
+      "present": "37",
+      "leave": "",
+      "late": "",
+      "absent": "",
+      "submittedAt": "2026-05-28T05:57:51.558Z",
+      "stage": "initial",
+      "className": "软件2402",
+      "instructor": "周焕哲",
+      "source": "classMonitor",
+      "id": "1779947871632"
+    },
+    {
       "date": "2026-05-25",
       "timeSlot": "下午",
       "classroom": "401",
