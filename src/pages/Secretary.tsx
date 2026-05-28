@@ -775,15 +775,6 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                         const hasAttendance = allAttendanceRecords.some(r => r.classroom === room && r.date === currentDate && r.timeSlot === currentTimeSlot)
                         const hasSupervision = supervisionRecords.some(r => r.classroom === room && r.date === currentDate && r.timeSlot === currentTimeSlot)
                         
-                        // 获取该教室今日当前时段的考勤记录
-                        const roomAttendanceRecords = allAttendanceRecords.filter(
-                          r => r.classroom === room && r.date === currentDate && r.timeSlot === currentTimeSlot
-                        );
-                        // 计算请假学生数量
-                        const leaveCount = roomAttendanceRecords.reduce(
-                          (count, record) => count + (record.leaveStudents?.length || 0), 0
-                        );
-                        
                         // 状态判断：无、待查、已查
                         let status = 'none' // 无
                         let bgColor = 'white'
@@ -1824,7 +1815,7 @@ function Secretary({ user, onLogout }: SecretaryProps) {
                               src={student.photoUrl} 
                               alt={`${student.name} 的请假证明`}
                               className="leave-photo-image"
-                              onError={(e) => {
+                              onError={(_e) => {
                                 console.error('图片加载失败:', student.photoUrl)
                               }}
                               onLoad={() => {

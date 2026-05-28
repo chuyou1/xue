@@ -462,14 +462,6 @@ function VicePresident({ user, onLogout }: VicePresidentProps) {
                     {expandedFloor === floor && (
                       <div className="classrooms-grid">
                         {getClassroomsWithAttendance(floor).map((room) => {
-                          // 获取该教室今日当前时段的考勤记录
-                          const roomAttendanceRecords = attendanceRecords.filter(
-                            r => r.classroom === room && r.date === currentDate && r.timeSlot === currentTimeSlot
-                          );
-                          // 计算请假学生数量
-                          const leaveCount = roomAttendanceRecords.reduce(
-                            (count, record) => count + (record.leaveStudents?.length || 0), 0
-                          );
                           return (
                             <div
                               key={room}
